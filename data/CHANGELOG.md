@@ -1,0 +1,5 @@
+# data changelog
+
+One line per re-freeze of data/test.jsonl.
+
+- 2026-09-30: test.jsonl a93251aaa852de6ee8d153a5fdae2718d689dc9e30e1abb8c74b802cb7ed00b8 -> 3159d327125ea899c093df1f427b39be62b0d633d2cdb24c8cbb13f5f02443c9 (seed 20260930 unchanged). Why: a blind re-label of the old test file, before any model saw it, disagreed with gold on 11 of 433 rows, 8 of them defects in two construction rules, both fixed. (1) eval.answer_quality: level 2 now means all N items present with exactly one vague, never a missing item; any missing item with a correct item given is level 1. (2) triage.anomaly_class: several matching classes no longer force unknown; the cause that explains at least 3/4 of the cost increase (log-scale shares of growth, extra calls, price, per-call config cost) is the label, and unknown is for comparable causes, missing data or self-contradicting evidence; misconfiguration no longer demands traffic data it does not need. Families 2 and 4 were regenerated (ids re-drawn, 500 rows and balanced labels kept); the other four families are unchanged row for row, and their ids keep their content.
