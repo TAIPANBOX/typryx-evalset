@@ -6,8 +6,8 @@ The answer is built at a level, and the level is a pure function of how the
 answer was built (`level_of`):
 
     3  all N items present and clear
-    2  all but one item (N-1 clear, one missing), or all N present with one vague
-    1  only one or two clear items (and N - items >= 2)
+    2  all N items present, exactly one of them vague (never a missing item)
+    1  one or more items missing, at least one correct item given
     0  off-topic: items from another topic, or a non-answer
 
 A group is one topic (its task phrasing and fact bank). Every topic renders
@@ -296,16 +296,19 @@ INTRO_P = 0.5
 
 
 def level_of(n_asked: int, clear: int, vague: int, offtopic: bool) -> int:
-    """The scoring rule, stated independently of how an answer is rendered."""
+    """The scoring rule, stated independently of how an answer is rendered.
+
+    3: all N items present and clear. 2: all N items present, exactly one of
+    them vague (a missing item is NEVER level 2). 1: one or more items
+    missing, at least one correct item given. 0: off-topic."""
     if offtopic:
         return 0
-    if clear == n_asked and vague == 0:
-        return 3
-    if vague == 0 and clear == n_asked - 1:
-        return 2
-    if vague == 1 and clear == n_asked - 1:
-        return 2
-    if vague == 0 and 1 <= clear <= 2 and n_asked - clear >= 2:
+    if clear + vague == n_asked:
+        if vague == 0:
+            return 3
+        if vague == 1:
+            return 2
+    elif vague == 0 and 1 <= clear < n_asked:
         return 1
     raise ValueError(f"no level for asked={n_asked} clear={clear} vague={vague}")
 
@@ -376,15 +379,11 @@ def generate(seed: int) -> list[Case]:
                         chosen = [bank[i][0] for i in order[:n]]
                         clear_n = n
                     elif level == 2:
-                        if rng.random() < 0.5:
-                            chosen = [bank[i][0] for i in order[:n - 1]]
-                            clear_n = n - 1
-                        else:
-                            chosen = [bank[i][0] for i in order[:n - 1]] + [bank[order[n - 1]][1]]
-                            clear_n, vague_n = n - 1, 1
-                            rng.shuffle(chosen)
+                        chosen = [bank[i][0] for i in order[:n - 1]] + [bank[order[n - 1]][1]]
+                        clear_n, vague_n = n - 1, 1
+                        rng.shuffle(chosen)
                     elif level == 1:
-                        clear_n = rng.choice([1, 2]) if n >= 4 else 1
+                        clear_n = rng.randint(1, n - 1)
                         chosen = [bank[i][0] for i in order[:clear_n]]
                     else:
                         offtopic = True
