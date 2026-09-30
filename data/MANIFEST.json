@@ -1,0 +1,238 @@
+{
+  "families": {
+    "action.risk_class": {
+      "counts": {
+        "dev": {
+          "destructive": 16,
+          "external_send": 12,
+          "financial": 12,
+          "read_only": 12,
+          "reversible_change": 15
+        },
+        "test": {
+          "destructive": 15,
+          "external_send": 12,
+          "financial": 12,
+          "read_only": 14,
+          "reversible_change": 16
+        },
+        "train": {
+          "destructive": 69,
+          "external_send": 76,
+          "financial": 76,
+          "read_only": 74,
+          "reversible_change": 69
+        }
+      },
+      "groups": {
+        "dev": 12,
+        "test": 12,
+        "total": 86,
+        "train": 62
+      },
+      "rows": 500,
+      "rows_by_split": {
+        "dev": 67,
+        "test": 69,
+        "train": 364
+      },
+      "template": "action.risk_class"
+    },
+    "console.question_topic": {
+      "counts": {
+        "dev": {
+          "approval": 12,
+          "identity": 16,
+          "incident": 15,
+          "other": 12,
+          "spend": 13
+        },
+        "test": {
+          "approval": 12,
+          "identity": 15,
+          "incident": 16,
+          "other": 12,
+          "spend": 14
+        },
+        "train": {
+          "approval": 76,
+          "identity": 69,
+          "incident": 69,
+          "other": 76,
+          "spend": 73
+        }
+      },
+      "groups": {
+        "dev": 10,
+        "test": 10,
+        "total": 73,
+        "train": 53
+      },
+      "rows": 500,
+      "rows_by_split": {
+        "dev": 68,
+        "test": 69,
+        "train": 363
+      },
+      "template": "console.question_topic"
+    },
+    "eval.answer_quality": {
+      "counts": {
+        "dev": {
+          "0": 20,
+          "1": 18,
+          "2": 17,
+          "3": 19
+        },
+        "test": {
+          "0": 19,
+          "1": 19,
+          "2": 17,
+          "3": 19
+        },
+        "train": {
+          "0": 86,
+          "1": 88,
+          "2": 91,
+          "3": 87
+        }
+      },
+      "groups": {
+        "dev": 5,
+        "test": 5,
+        "total": 34,
+        "train": 24
+      },
+      "rows": 500,
+      "rows_by_split": {
+        "dev": 74,
+        "test": 74,
+        "train": 352
+      },
+      "template": "eval.answer_quality"
+    },
+    "eval.outcome_met": {
+      "counts": {
+        "dev": {
+          "false": 37,
+          "true": 33
+        },
+        "test": {
+          "false": 37,
+          "true": 36
+        },
+        "train": {
+          "false": 176,
+          "true": 181
+        }
+      },
+      "groups": {
+        "dev": 10,
+        "test": 10,
+        "total": 70,
+        "train": 50
+      },
+      "rows": 500,
+      "rows_by_split": {
+        "dev": 70,
+        "test": 73,
+        "train": 357
+      },
+      "template": "eval.outcome_met"
+    },
+    "request.complexity": {
+      "counts": {
+        "dev": {
+          "cheap": 15,
+          "default": 21,
+          "hard": 17,
+          "reasoning": 15
+        },
+        "test": {
+          "cheap": 16,
+          "default": 21,
+          "hard": 18,
+          "reasoning": 16
+        },
+        "train": {
+          "cheap": 94,
+          "default": 83,
+          "hard": 90,
+          "reasoning": 94
+        }
+      },
+      "groups": {
+        "dev": 10,
+        "test": 10,
+        "total": 71,
+        "train": 51
+      },
+      "rows": 500,
+      "rows_by_split": {
+        "dev": 68,
+        "test": 71,
+        "train": 361
+      },
+      "template": "request.complexity"
+    },
+    "triage.anomaly_class": {
+      "counts": {
+        "dev": {
+          "expected_growth": 15,
+          "misconfiguration": 16,
+          "price_change": 15,
+          "runaway_agent": 15,
+          "unknown": 16
+        },
+        "test": {
+          "expected_growth": 15,
+          "misconfiguration": 15,
+          "price_change": 16,
+          "runaway_agent": 16,
+          "unknown": 15
+        },
+        "train": {
+          "expected_growth": 70,
+          "misconfiguration": 69,
+          "price_change": 69,
+          "runaway_agent": 69,
+          "unknown": 69
+        }
+      },
+      "groups": {
+        "dev": 5,
+        "test": 5,
+        "total": 32,
+        "train": 22
+      },
+      "rows": 500,
+      "rows_by_split": {
+        "dev": 77,
+        "test": 77,
+        "train": 346
+      },
+      "template": "triage.anomaly_class"
+    }
+  },
+  "files": {
+    "all.jsonl": {
+      "rows": 3000,
+      "sha256": "6e55974dd6f9e0ca515b046dee23708ed1ee8421300d1cc709f18ad43e3a7605"
+    },
+    "dev.jsonl": {
+      "rows": 424,
+      "sha256": "4d873fdca7590c407b0ef42fd9a31a22223773180f38812b939851bc0caa4f6d"
+    },
+    "test.jsonl": {
+      "rows": 433,
+      "sha256": "a93251aaa852de6ee8d153a5fdae2718d689dc9e30e1abb8c74b802cb7ed00b8"
+    },
+    "train.jsonl": {
+      "rows": 2143,
+      "sha256": "12f62ff30031d847d00c6cef9f87d6d768afcda44faa5c52be192a877a3e08d6"
+    }
+  },
+  "generator_commit": "7ed5c2d87e86cd3eaee3b2f0c36b1f982fa296ac",
+  "rows": 3000,
+  "seed": 20260930
+}
