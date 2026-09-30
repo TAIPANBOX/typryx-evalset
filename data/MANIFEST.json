@@ -81,8 +81,8 @@
         "dev": {
           "0": 20,
           "1": 18,
-          "2": 18,
-          "3": 19
+          "2": 19,
+          "3": 18
         },
         "test": {
           "0": 19,
@@ -93,8 +93,8 @@
         "train": {
           "0": 86,
           "1": 88,
-          "2": 88,
-          "3": 88
+          "2": 87,
+          "3": 89
         }
       },
       "groups": {
@@ -217,22 +217,22 @@
   "files": {
     "all.jsonl": {
       "rows": 3000,
-      "sha256": "8e21c00cca8a6862708096666d51cd865bf5d3b6aaebc1f3b984d1158b418b35"
+      "sha256": "bc58a7aa8be6c2088bd52fdf8ed998ccd60f70c3122d1cb99cea2c03fad183c4"
     },
     "dev.jsonl": {
       "rows": 425,
-      "sha256": "3e2dec0aff8f5848772781eac24ec6a83efe70640f747b5a2e0da020bd602a1f"
+      "sha256": "0254b5ee9ada047349475cf03bb08472a46207158dcdfa62b02d7227723f4ead"
     },
     "test.jsonl": {
       "rows": 434,
-      "sha256": "2a92f28294500d7a0c8197fefd9c21268e79733a18d6ef59bf53d2d6de64fdf1"
+      "sha256": "bd5f3cf42b81bb1ba14938b84c0bf321df4ed1f6ec96015950c1357033bab03f"
     },
     "train.jsonl": {
       "rows": 2141,
-      "sha256": "a4108576a5316d56f3bb9cf0e5e88c1aed27cf551505d604bb7b4a8d061ebdd5"
+      "sha256": "6c6c9e49745182321af89b443997dc2f3a302f2fd2bcbb5dd7196467ce608ac3"
     }
   },
-  "generator_commit": "3300bc8773cb36a12c9255a9d19630a75099d491",
+  "generator_commit": "13c39562c6d18b40d7bc2fef6644bfcc5e72615e",
   "rows": 3000,
   "seed": 20260930
 }
