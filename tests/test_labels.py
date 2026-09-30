@@ -48,83 +48,140 @@ class Complexity(unittest.TestCase):
 
 # ============================================================ 2 triage.anomaly_class
 
+import math
+
+THREE_QUARTERS = 0.75
+SETTINGS = {"cache_disabled", "max_tokens_raised", "model_route_changed", "quota_raised", "rate_limit_removed", "context_cap_raised"}
+
+
+def ref_shares(p):
+    """Each cause's share of the cost increase, written from the rule's prose:
+    work in log terms (calls x price multiply), count only the increase, and
+    divide by the larger of the headline increase and what is explained."""
+    ln = lambda pct: math.log1p(pct / 100.0)
+    headline = ln(p["spend"])
+    calls = None if p["calls"] is None else max(0.0, ln(p["calls"]))
+    demand = None if p["traffic"] is None else max(0.0, ln(p["traffic"]))
+    price = None if p["price"] is None else max(0.0, ln(p["price"]))
+    amounts = {"price": price}
+    if calls is not None and demand is not None:
+        amounts["growth"] = min(calls, demand)
+        amounts["runaway"] = calls - min(calls, demand)
+    else:
+        amounts["growth"] = amounts["runaway"] = None
+    amounts["config"] = None if (calls is None or price is None) else max(0.0, headline - calls - price)
+    explained = sum(v for k, v in amounts.items() if v is not None)
+    if calls is not None and demand is None:      # calls known but not attributable to demand or to extra calls
+        explained += calls
+    denom = max(headline, explained)
+    return {k: (None if v is None else v / denom) for k, v in amounts.items()}
+
+
 def ref_classify(p):
-    """The class table of the spec, coded as a decision list that names each
-    class's required evidence and its vetoes. Written independently of
-    gen.triage.matching_classes."""
-    calls, traffic, unique, price, event = p["calls"], p["traffic"], p["unique"], p["price"], p["event"]
-    settings = {"cache_disabled", "max_tokens_raised", "model_route_changed", "quota_raised", "rate_limit_removed", "context_cap_raised"}
-
-    def flat(v):
-        return v is not None and abs(v) <= 10
-
-    def price_quiet(v):
-        return v is None or abs(v) <= 4
-
-    hits = []
-    # price change: usage flat, unit price up
-    if price is not None and price >= 10 and flat(calls):
-        if (traffic is None or flat(traffic)) and event in ("none", "noise"):
-            hits.append("price_change")
-    # ordinary growth: traffic up and calls follow it
-    if traffic is not None and traffic >= 20 and calls is not None and abs(calls - traffic) <= 15:
-        if price_quiet(price) and (unique is None or unique >= 50) and event in ("none", "noise"):
-            hits.append("expected_growth")
-    # runaway: calls far up on flat traffic with repeated prompts
-    if calls is not None and calls >= 100 and unique is not None and unique <= 25 and flat(traffic):
-        if price_quiet(price) and event in ("none", "noise", "agent_deploy"):
-            hits.append("runaway_agent")
-    # misconfiguration: a setting changed while traffic and price stayed flat
-    if event in settings and flat(traffic) and price_quiet(price):
-        if (unique is None or unique >= 40) and (calls is None or calls < 100):
-            hits.append("misconfiguration")
-    return hits[0] if len(hits) == 1 else "unknown"
+    sh = ref_shares(p)
+    u, event = p["unique"], p["event"]
+    verdicts = []
+    if sh["growth"] is not None and sh["growth"] >= THREE_QUARTERS and not (u is not None and u < 50):
+        verdicts.append("expected_growth")
+    if sh["runaway"] is not None and sh["runaway"] >= THREE_QUARTERS and u is not None and u <= 25:
+        verdicts.append("runaway_agent")
+    if sh["config"] is not None and sh["config"] >= THREE_QUARTERS and event in SETTINGS:
+        verdicts.append("misconfiguration")
+    if sh["price"] is not None and sh["price"] >= THREE_QUARTERS:
+        verdicts.append("price_change")
+    return verdicts[0] if len(verdicts) == 1 else "unknown"
 
 
-#: Hand-written truth table: (calls, traffic, unique, price, event) -> class.
+#: Hand-written truth table: (spend, calls, traffic, unique, price, event) -> class.
+#: The first three rows are the rows a blind re-label disputed (by content).
 TRUTH = [
-    ((150, 0, 10, 0, "none"), "runaway_agent"),
-    ((150, 0, 10, 0, "agent_deploy"), "runaway_agent"),
-    ((150, 0, 10, 0, "cache_disabled"), "unknown"),       # looping AND a setting change: contradictory
-    ((150, None, 10, 0, "none"), "unknown"),              # traffic hidden
-    ((80, 0, 10, 0, "none"), "unknown"),                  # below the runaway bar
-    ((60, 62, 80, 1, "none"), "expected_growth"),
-    ((60, 62, 80, 1, "model_route_changed"), "unknown"),  # growth plus a setting change
-    ((60, 62, 80, None, "noise"), "expected_growth"),
-    ((60, None, 80, 1, "none"), "unknown"),
-    ((3, 2, 70, 40, "none"), "price_change"),
-    ((3, None, None, 40, "none"), "price_change"),
-    ((3, 2, 70, None, "none"), "unknown"),
-    ((3, 50, 70, 40, "none"), "unknown"),                 # price and traffic both moved
-    ((20, 2, 70, 0, "cache_disabled"), "misconfiguration"),
-    ((None, 2, None, None, "quota_raised"), "misconfiguration"),
-    ((20, None, 70, 0, "quota_raised"), "unknown"),
-    ((20, 2, 70, 0, "none"), "unknown"),
-    ((None, None, None, None, "none"), "unknown"),
+    ((486, 465, 4, 13, 21, "none"), "runaway_agent"),              # tri-0252: repeats, flat traffic, price a small part
+    ((485, 454, 3, 10, 31, "none"), "runaway_agent"),              # tri-0436
+    ((316, 2, None, None, 2, "cache_disabled"), "misconfiguration"),   # tri-0231: cache off, volume and price flat, cost 4x
+    ((266, 149, 4, 18, 47, "none"), "unknown"),                    # tri-0139: calls and price comparable
+    ((80, 49, 13, 30, 9, "noise"), "unknown"),                     # tri-0212
+    ((283, None, None, None, None, "rate_limit_removed"), "unknown"),  # tri-0106: no volume data
+    ((256, None, None, 69, 4, "model_route_changed"), "unknown"),  # tri-0404
+    ((30, None, None, None, None, "context_cap_raised"), "unknown"),   # tri-0467
+    ((150, 150, 0, 10, 0, "agent_deploy"), "runaway_agent"),
+    ((150, 150, 0, 10, 0, "cache_disabled"), "runaway_agent"),     # one cause dominates; the event does not explain the cost
+    ((150, 150, None, 10, 0, "none"), "unknown"),                  # traffic hidden: cannot split calls from demand
+    ((150, 150, 0, 60, 0, "none"), "unknown"),                     # extra calls but diverse prompts
+    ((60, 60, 62, 80, 1, "none"), "expected_growth"),
+    ((60, 60, 62, 10, 1, "none"), "unknown"),                      # growth numbers but mostly repeats
+    ((60, 60, None, 80, 1, "none"), "unknown"),
+    ((50, 3, 2, 70, 40, "none"), "price_change"),
+    ((40, None, None, None, 40, "none"), "price_change"),          # price alone explains the whole increase
+    ((50, 3, 2, 70, None, "none"), "unknown"),
+    ((120, 60, 60, 70, 40, "none"), "unknown"),                    # growth and price comparable
+    ((200, 20, 2, 70, 0, "cache_disabled"), "misconfiguration"),
+    ((200, None, 2, None, None, "quota_raised"), "unknown"),       # cannot rule out calls or price
+    ((200, 20, 2, 70, 0, "none"), "unknown"),                      # unexplained and no setting changed
+    ((300, None, None, None, None, "none"), "unknown"),
 ]
 
 
 class Triage(unittest.TestCase):
     def test_truth_table_holds_for_reference_and_generator(self):
-        for (c, t, u, pr, e), want in TRUTH:
-            p = {"calls": c, "traffic": t, "unique": u, "price": pr, "event": e}
+        for (spend, c, t, u, pr, e), want in TRUTH:
+            p = {"spend": spend, "calls": c, "traffic": t, "unique": u, "price": pr, "event": e}
             self.assertEqual(ref_classify(p), want, p)
             self.assertEqual(triage.classify(p), want, p)
 
+    def test_a_dominant_cause_wins_even_when_a_second_cause_is_present(self):
+        # +465% calls on flat traffic with 13% distinct prompts, price +21%: calls are about 88% of the increase
+        p = {"spend": 486, "calls": 465, "traffic": 4, "unique": 13, "price": 21, "event": "none"}
+        self.assertGreaterEqual(ref_shares(p)["runaway"], 0.85)
+        self.assertEqual(triage.classify(p), "runaway_agent")
+        # calls +149% against price +47%: the two are comparable, nothing reaches 3/4
+        q = {"spend": 266, "calls": 149, "traffic": 4, "unique": 18, "price": 47, "event": "none"}
+        self.assertLess(max(v for v in ref_shares(q).values() if v is not None), THREE_QUARTERS)
+        self.assertEqual(triage.classify(q), "unknown")
+
+    def test_a_label_does_not_demand_evidence_its_own_verdict_does_not_need(self):
+        # the bug behind tri-0231: a setting change whose cost is all per-call cost needs calls and
+        # price to be known, not traffic
+        p = {"spend": 316, "calls": 2, "traffic": None, "unique": None, "price": 2, "event": "cache_disabled"}
+        self.assertEqual(triage.classify(p), "misconfiguration")
+        # and every setting event can be the cause
+        for ev in triage.SETTING_EVENTS:
+            self.assertEqual(triage.classify(dict(p, event=ev)), "misconfiguration", ev)
+
     def test_generator_classifier_agrees_with_the_reference_on_a_sweep(self):
         rng = random.Random(99)
-        vals = [None, -30, -10, -9, 0, 4, 5, 9, 10, 11, 14, 19, 20, 21, 40, 60, 99, 100, 101, 250, 900]
-        uvals = [None, 0, 10, 24, 25, 26, 39, 40, 49, 50, 51, 90]
-        for _ in range(20000):
-            p = {"calls": rng.choice(vals), "traffic": rng.choice(vals), "unique": rng.choice(uvals),
-                 "price": rng.choice(vals), "event": rng.choice(triage.ALL_EVENTS)}
+        vals = [None, -30, -10, -4, 0, 4, 10, 20, 35, 60, 99, 100, 150, 250, 465, 900]
+        uvals = [None, 0, 10, 25, 26, 40, 49, 50, 51, 90]
+        checked = 0
+        for _ in range(40000):
+            p = {"spend": rng.choice([25, 40, 80, 120, 200, 316, 486, 800]), "calls": rng.choice(vals), "traffic": rng.choice(vals),
+                 "unique": rng.choice(uvals), "price": rng.choice(vals), "event": rng.choice(triage.ALL_EVENTS)}
+            near = any(v is not None and abs(v - THREE_QUARTERS) < 1e-9 for v in ref_shares(p).values())
+            if near:
+                continue
+            checked += 1
             self.assertEqual(triage.classify(p), ref_classify(p), p)
+        self.assertGreater(checked, 39000)
 
     def test_every_row_gold_is_the_label_of_its_parameters(self):
         rows = disk_rows_with_params("triage.anomaly_class")
         self.assertEqual(len(rows), 500)
         for row, p in rows:
             self.assertEqual(ref_classify(p), row["gold"], (row["id"], p))
+
+    def test_every_share_is_clear_of_the_bar_so_no_row_turns_on_a_hair(self):
+        for row, p in disk_rows_with_params("triage.anomaly_class"):
+            for k, v in ref_shares(p).items():
+                self.assertTrue(v is None or abs(v - THREE_QUARTERS) > 0.03, (row["id"], k, v))
+
+    def test_the_headline_spend_reconciles_with_the_shown_calls_and_price(self):
+        for row, p in disk_rows_with_params("triage.anomaly_class"):
+            if p["calls"] is None or p["price"] is None:
+                continue
+            implied = round(100 * ((1 + p["calls"] / 100) * (1 + p["price"] / 100) - 1))
+            if row["gold"] == "misconfiguration":
+                self.assertGreaterEqual(p["spend"], implied, row["id"])       # per-call cost rose too
+            elif row["gold"] != "unknown":
+                self.assertEqual(p["spend"], implied, row["id"])
 
     SURFACE_EVENT = {
         "cache_disabled": r"cach",
@@ -312,11 +369,13 @@ def asked_count(task: str) -> int:
 
 
 def reference_level(n: int, clear: int, vague: int) -> int:
+    """3: all N clear. 2: all N present, exactly one vague. 1: something
+    missing, at least one correct item. 0: no item of the topic at all."""
     if clear == n and vague == 0:
         return 3
-    if clear == n - 1 and vague in (0, 1):
+    if clear == n - 1 and vague == 1:
         return 2
-    if vague == 0 and clear in (1, 2) and n - clear >= 2:
+    if vague == 0 and 1 <= clear <= n - 1:
         return 1
     if clear == 0 and vague == 0:
         return 0
@@ -350,9 +409,23 @@ class Quality(unittest.TestCase):
 
     def test_level_rule_rejects_what_the_spec_does_not_define(self):
         with self.assertRaises(ValueError):
-            quality.level_of(4, 2, 1, False)
+            quality.level_of(4, 2, 1, False)      # one missing AND one vague
         with self.assertRaises(ValueError):
-            quality.level_of(4, 0, 0, False)
+            quality.level_of(4, 0, 0, False)      # nothing given, not off-topic
+        with self.assertRaises(ValueError):
+            quality.level_of(4, 2, 2, False)      # two vague
+
+    def test_a_missing_item_is_never_level_two(self):
+        # N-1 clear items and nothing else: one item missing -> 1, not 2
+        self.assertEqual(quality.level_of(3, 2, 0, False), 1)
+        self.assertEqual(reference_level(3, 2, 0), 1)
+        self.assertEqual(quality.level_of(3, 2, 1, False), 2)
+        self.assertEqual(reference_level(3, 2, 1), 2)
+        for row, p in disk_rows_with_params("eval.answer_quality"):
+            if row["gold"] == 2:
+                self.assertEqual((p["clear"], p["vague"]), (p["n"] - 1, 1), row["id"])
+            if row["gold"] == 1:
+                self.assertTrue(1 <= p["clear"] < p["n"] and p["vague"] == 0, row["id"])
 
     def test_word_count_does_not_track_the_level(self):
         rows = disk_rows_with_params("eval.answer_quality")

@@ -109,10 +109,41 @@ MUTANTS = {
         "split_groups no longer refuses a stratum too small to split",
         [("gen/common.py", "if n - n_dev - n_test < 1:", "if False:")],
         [SPL + "Splitter.test_too_few_groups_refuse_rather_than_leak"], "gen"),
-    "runaway-threshold": (
-        "triage.classify lowers the runaway bar from +100 to +50 percent calls",
-        [("gen/triage.py", "if (c is not None and c >= 100 and u is not None", "if (c is not None and c >= 50 and u is not None")],
-        [LAB + "Triage.test_generator_classifier_agrees_with_the_reference_on_a_sweep", LAB + "Triage.test_truth_table_holds_for_reference_and_generator"], "gen"),
+    "dominance-bar-lowered": (
+        "triage: a cause wins at half the cost increase instead of three quarters",
+        [("gen/triage.py", "DOM = 0.75", "DOM = 0.5")],
+        [LAB + "Triage.test_generator_classifier_agrees_with_the_reference_on_a_sweep", LAB + "Triage.test_truth_table_holds_for_reference_and_generator",
+         LAB + "Triage.test_a_dominant_cause_wins_even_when_a_second_cause_is_present"], "gen"),
+    "second-cause-vetoes": (
+        "triage: any second cause above 5 percent of the increase forces unknown (the old rule)",
+        [("gen/triage.py", 'return w[0] if len(w) == 1 else "unknown"',
+          'return w[0] if len(w) == 1 and sum(1 for v in shares(p).values() if v is not None and v > 0.05) == 1 else "unknown"')],
+        [LAB + "Triage.test_a_dominant_cause_wins_even_when_a_second_cause_is_present", LAB + "Triage.test_truth_table_holds_for_reference_and_generator"], "gen"),
+    "config-demands-traffic": (
+        "triage: misconfiguration needs traffic known (the tri-0231 bug)",
+        [("gen/triage.py", 's["config"] is not None and s["config"] >= DOM and e in SETTING_EVENTS:', 's["config"] is not None and s["config"] >= DOM and e in SETTING_EVENTS and p["traffic"] is not None:')],
+        [LAB + "Triage.test_a_label_does_not_demand_evidence_its_own_verdict_does_not_need", LAB + "Triage.test_truth_table_holds_for_reference_and_generator"], "gen"),
+    "bar-margin-removed": (
+        "triage: rows may sit on the 3/4 bar",
+        [("gen/triage.py", "MARGIN = 0.03", "MARGIN = 0.0")],
+        [LAB + "Triage.test_every_share_is_clear_of_the_bar_so_no_row_turns_on_a_hair"], "gen"),
+    "spend-unreconciled": (
+        "triage: the headline spend drifts up to 15 points from what calls and price imply",
+        [("gen/triage.py", 'p["spend"] = round(100 * ((1 + c / 100) * (1 + pr / 100) * cfg - 1))', 'p["spend"] = round(100 * ((1 + c / 100) * (1 + pr / 100) * cfg - 1)) + rng.randint(-15, 15)')],
+        [LAB + "Triage.test_the_headline_spend_reconciles_with_the_shown_calls_and_price"], "gen"),
+    "unknown-always-blank": (
+        "every unknown scenario is a bare headline",
+        [("gen/triage.py", 'flavour = rng.choice(["hidden", "hidden", "comparable", "comparable", "contradict", "contradict", "gray", "unreconciled", "blank"])', 'flavour = "blank"')],
+        [LAB + "Triage.test_unknown_rows_come_in_the_three_flavours"], "gen"),
+    "missing-item-is-level-2": (
+        "quality: a level-2 answer omits an item instead of giving a vague one (the old wording)",
+        [("gen/quality.py", "chosen = [bank[i][0] for i in order[:n - 1]] + [bank[order[n - 1]][1]]\n                        clear_n, vague_n = n - 1, 1\n                        rng.shuffle(chosen)",
+          "chosen = [bank[i][0] for i in order[:n - 1]]\n                        clear_n, vague_n = n - 1, 0")],
+        [LAB + "Quality.test_level_is_recomputed_from_the_text_by_counting_the_topics_facts", LAB + "Quality.test_a_missing_item_is_never_level_two"], "gen"),
+    "level-rule-old-wording": (
+        "quality.level_of scores N-1 clear items and nothing else as level 2",
+        [("gen/quality.py", "    elif vague == 0 and 1 <= clear < n_asked:\n        return 1", "    elif vague == 0 and clear == n_asked - 1:\n        return 2\n    elif vague == 0 and 1 <= clear < n_asked:\n        return 1")],
+        [LAB + "Quality.test_a_missing_item_is_never_level_two", LAB + "Quality.test_generator_parameters_give_the_same_level"], "gen"),
     "gray-zone-mislabelled": (
         "gray-zone scenarios are drawn but the row is labelled expected_growth",
         [("gen/triage.py", "cases.append(Case(FAMILY, TEMPLATE, {\"anomaly\": anomaly, \"recent_changes\": changes}, lab, sid, p))",
@@ -138,10 +169,6 @@ MUTANTS = {
         "a default template picks up the word 'carefully'",
         [("gen/complexity.py", '("Give me a checklist for {a}.", {"a": CHECKLISTS}),', '("Carefully give me a checklist for {a}.", {"a": CHECKLISTS}),')],
         [LAB + "Complexity.test_reasoning_cue_if_and_only_if_reasoning"], "gen"),
-    "two-items-missing": (
-        "a level-2 answer omits two items, not one",
-        [("gen/quality.py", "chosen = [bank[i][0] for i in order[:n - 1]]\n                            clear_n = n - 1", "chosen = [bank[i][0] for i in order[:n - 2]]\n                            clear_n = n - 1")],
-        [LAB + "Quality.test_level_is_recomputed_from_the_text_by_counting_the_topics_facts"], "gen"),
     "length-tracks-level": (
         "padding removed, so short answers are the low levels",
         [("gen/quality.py", "while sum(len(x.split()) for x in parts) < target and pool:", "while False and pool:")],
@@ -184,10 +211,6 @@ MUTANTS = {
         [("gen/complexity.py", '("Convert to uppercase: {t}", {"t": WORDS_UP}),',
           '("Convert the following text to uppercase exactly as typed, preserving every space, every punctuation mark and every line break in the original, and do not add, remove or reword anything else at all in your reply, and please do not wrap it in a code block or add any commentary before or after the converted text, just the text itself with nothing else around it, thank you very much: {t}", {"t": WORDS_UP}),')],
         [LAB + "Complexity.test_cheap_prompts_are_short_and_hard_prompts_are_not_one_liners"], "gen"),
-    "unknown-always-blank": (
-        "every unknown scenario is a bare headline",
-        [("gen/triage.py", 'flavour = rng.choice(["hidden", "hidden", "contradict", "contradict", "gray", "gray", "blank"])', 'flavour = "blank"')],
-        [LAB + "Triage.test_unknown_rows_come_in_the_three_flavours"], "gen"),
     "task-omits-operand": (
         "an addition task states the first operand twice and never the second",
         [("gen/outcome.py", '"What is {a} + {b}?", "Add {a} and {b}."', '"What is {a} + {a}?", "Add {a} and {b}."')],
