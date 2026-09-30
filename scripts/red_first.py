@@ -153,27 +153,47 @@ MUTANTS = {
         "triage: unknown rows never vary their unrelated event",
         [("gen/triage.py", "unique=None, price=None, event=rng.choice(QUIET_EVENTS), spend=_rint(rng, 25, 400))", "unique=None, price=None, event='none', spend=_rint(rng, 25, 400))")],
         [LAB + "Triage.test_every_class_shows_up_in_its_varieties"], "gen"),
-    "level-rule-share-ignored": (
-        "quality.level_of scores one missing item out of three as level 2",
-        [("gen/quality.py", "if defects == 1 and (n_asked >= 4 or (vague == 1 and missing == 0)):", "if defects == 1:")],
-        [LAB + "Quality.test_level_table_holds_for_reference_and_generator", LAB + "Quality.test_three_of_four_is_level_two_and_two_of_three_is_level_one"], "gen"),
-    "level-two-allows-two-defects": (
-        "quality.level_of scores two defects out of five as level 2",
-        [("gen/quality.py", "if defects == 1 and (n_asked >= 4", "if defects <= 2 and (n_asked >= 4")],
-        [LAB + "Quality.test_level_table_holds_for_reference_and_generator"], "gen"),
-    "three-of-four-scored-one": (
-        "quality.level_of scores one missing item out of four or five as level 1 (the earlier rule)",
-        [("gen/quality.py", "if defects == 1 and (n_asked >= 4 or (vague == 1 and missing == 0)):", "if defects == 1 and vague == 1:")],
-        [LAB + "Quality.test_level_table_holds_for_reference_and_generator", LAB + "Quality.test_three_of_four_is_level_two_and_two_of_three_is_level_one"], "gen"),
-    "missing-item-in-three-labelled-2": (
-        "quality: for N = 3 a level-2 answer drops an item instead of giving a vague one",
-        [("gen/quality.py", "clear_n, vague_n = (2, 1) if n == 3 else (n - 1, rng.choice([0, 1]))", "clear_n, vague_n = (2, 0) if n == 3 else (n - 1, rng.choice([0, 1]))")],
-        [LAB + "Quality.test_level_is_recomputed_from_the_text_by_counting_the_topics_facts", LAB + "Quality.test_three_of_four_is_level_two_and_two_of_three_is_level_one"], "gen"),
     "unstated-figures-read-as-unknown": (
         "triage: misconfiguration rows with no call figure are labelled unknown (the tri-0106 reading)",
         [("gen/triage.py", "cases.append(Case(FAMILY, TEMPLATE, {\"anomaly\": anomaly, \"recent_changes\": changes}, lab, sid, p))",
           "cases.append(Case(FAMILY, TEMPLATE, {\"anomaly\": anomaly, \"recent_changes\": changes}, ('unknown' if (lab == 'misconfiguration' and p['calls'] is None) else lab), sid, p))")],
         [LAB + "Triage.test_every_row_gold_is_the_label_of_its_parameters"], "gen"),
+    "two-of-three-scored-two": (
+        "quality.level_of scores 2 of 3 as level 2 (one short, for any N)",
+        [("gen/quality.py", "if given == n_asked - 1 and n_asked >= 4:", "if given == n_asked - 1:")],
+        [LAB + "Quality.test_in_between_shares_are_refused_and_never_generated"], "gen"),
+    "three-of-five-scored-one": (
+        "quality.level_of scores 3 of 5 (and 2 of 3) as level 1 instead of refusing the in-between share",
+        [("gen/quality.py", "if 2 * given <= n_asked:", "if 3 * given <= 2 * n_asked:")],
+        [LAB + "Quality.test_in_between_shares_are_refused_and_never_generated"], "gen"),
+    "half-of-four-scored-two": (
+        "quality.level_of scores 2 of 4 as level 2",
+        [("gen/quality.py", "if given == n_asked - 1 and n_asked >= 4:", "if given >= n_asked - 2 and n_asked >= 4:")],
+        [LAB + "Quality.test_level_table_holds_for_reference_and_generator"], "gen"),
+    "in-between-shares-generated": (
+        "quality: level-1 answers may give up to N-1 items, so 2 of 3 and 3 of 5 appear",
+        [("gen/quality.py", "return n, rng.randint(1, n // 2)", "return n, rng.randint(1, n - 1)")],
+        [LAB + "Quality.test_level_is_recomputed_from_the_text_by_counting_the_topics_facts", LAB + "Quality.test_in_between_shares_are_refused_and_never_generated"], "gen"),
+    "level-two-for-three": (
+        "quality: level 2 is also drawn for N = 3 (2 of 3)",
+        [("gen/quality.py", "n = rng.choice([4, 5])\n        return n, n - 1", "n = rng.choice([3, 4, 5])\n        return n, n - 1")],
+        [LAB + "Quality.test_in_between_shares_are_refused_and_never_generated"], "gen"),
+    "vague-item-generated": (
+        "quality: the last given item of every non-off-topic answer is a hedged, vague one",
+        [("gen/quality.py", "chosen = [bank[i] for i in order[:given]]", "chosen = [bank[i] for i in order[:given - 1]] + ['Something to do with timing, perhaps']")],
+        [LAB + "Quality.test_no_vague_wording_is_generated"], "gen"),
+    "level-rule-lenient": (
+        "quality.level_of accepts 0 items for a non-off-topic answer and more items than asked",
+        [("gen/quality.py", "if not 1 <= given <= n_asked:", "if False:")],
+        [LAB + "Quality.test_level_rule_rejects_what_the_spec_does_not_define"], "gen"),
+    "params-given-wrong": (
+        "quality: level-1 rows record one item more than they show",
+        [("gen/quality.py", '"given": given,', '"given": given + (1 if level == 1 else 0),')],
+        [LAB + "Quality.test_generator_parameters_give_the_same_level"], "gen"),
+    "bank-overlap": (
+        "a fact is a substring of another fact in its own bank",
+        [("gen/quality.py", '        "The vendor raised its per-token price",\n', '        "Caching was switched off",\n')],
+        [LAB + "Quality.test_the_fact_banks_do_not_overlap"], "gen"),
     "event-text-mismatch": (
         "the rendered change text names a cache change whatever the event parameter says",
         [("gen/triage.py", "text = rng.choice(EVENTS[p[\"event\"]])", "text = rng.choice(EVENTS['cache_disabled' if p['event'] == 'quota_raised' else p['event']])")],
@@ -245,18 +265,6 @@ MUTANTS = {
         [("gen/outcome.py", "cands = [w, right[:-1], right[1:]]", "cands = [right, right[:-1], right[1:]]"),
          ("gen/outcome.py", "cs = [c for c in candidates if c != right]", "cs = list(candidates)")],
         [LAB + "Outcome.test_near_misses_differ_from_the_right_answer", LAB + "Outcome.test_sort_and_reverse_near_misses_are_really_different_strings"], "gen"),
-    "bank-overlap": (
-        "a vague wording is a substring of its own clear wording",
-        [("gen/quality.py", '("The vendor raised its per-token price", "Pricing is probably different now")', '("The vendor raised its per-token price", "The vendor raised its per-token")')],
-        [LAB + "Quality.test_the_fact_banks_do_not_overlap"], "gen"),
-    "params-clear-wrong": (
-        "level-1 rows record one clear item more than they show",
-        [("gen/quality.py", '"clear": clear_n, "vague"', '"clear": clear_n + (1 if level == 1 else 0), "vague"')],
-        [LAB + "Quality.test_generator_parameters_give_the_same_level"], "gen"),
-    "level-rule-lenient": (
-        "quality.level_of accepts more items than asked and three vague items",
-        [("gen/quality.py", "if missing < 0 or vague > 2:", "if False:")],
-        [LAB + "Quality.test_level_rule_rejects_what_the_spec_does_not_define"], "gen"),
     "reference-verb-table-incomplete": (
         "(a fault in the TEST's own rule table) 'post' missing from the reversible verbs",
         [("tests/test_labels.py", '"cordon", "stop", "enable", "start", "post", "snooze"', '"cordon", "stop", "enable", "start", "snooze"')],

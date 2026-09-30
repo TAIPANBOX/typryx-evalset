@@ -380,30 +380,27 @@ def asked_count(task: str) -> int:
     raise AssertionError(task)
 
 
-def reference_level(n: int, clear: int, vague: int) -> int:
-    """A reader's share-of-the-task rule, from the counts found in the text.
-    Defects = missing + vague. 3: none. 2: one defect, and N >= 4 or (N = 3
-    and the defect is a vague item). 1: a correct item but more defects.
-    0: nothing of the topic at all."""
-    if clear == 0 and vague == 0:
+def reference_level(n: int, given: int) -> int:
+    """A reader's share-of-the-task rule on the count of correct clear items
+    found in the text. 3: all N. 2: N-1, only when N >= 4. 1: at least one but
+    at most half of N. 0: nothing of the topic. Anything else (2 of 3, 3 of 5)
+    is an in-between share the benchmark never contains."""
+    if given == 0:
         return 0
-    missing = n - clear - vague
-    if clear < 1 or missing < 0:
-        raise AssertionError((n, clear, vague))
-    defects = missing + vague
-    if defects == 0:
+    if given == n:
         return 3
-    if defects == 1:
-        if n >= 4:
-            return 2
-        return 2 if vague == 1 else 1
-    return 1
+    if given == n - 1 and n >= 4:
+        return 2
+    if 1 <= given and 2 * given <= n:
+        return 1
+    raise AssertionError(("in-between share", n, given))
 
 
 class Quality(unittest.TestCase):
     def test_the_fact_banks_do_not_overlap(self):
         for slug, _, bank in quality.TOPICS:
-            texts = [t.lower() for pair in bank for t in pair]
+            self.assertEqual(len(bank), 6, slug)
+            texts = [t.lower() for t in bank]
             for i, a in enumerate(texts):
                 for j, b in enumerate(texts):
                     if i != j:
@@ -415,56 +412,58 @@ class Quality(unittest.TestCase):
         self.assertEqual(len(rows), 500)
         for row, p in rows:
             ans = row["state"]["final_answer"].lower()
-            bank = topics[row["group"]]
-            clear = sum(1 for c, _ in bank if c.lower() in ans)
-            vague = sum(1 for _, v in bank if v.lower() in ans)
+            given = sum(1 for fact in topics[row["group"]] if fact.lower() in ans)
             n = asked_count(row["state"]["task"])
-            self.assertEqual(reference_level(n, clear, vague), row["gold"], (row["id"], n, clear, vague))
+            self.assertEqual(reference_level(n, given), row["gold"], (row["id"], n, given))
 
     def test_generator_parameters_give_the_same_level(self):
         for row, p in disk_rows_with_params("eval.answer_quality"):
-            self.assertEqual(quality.level_of(p["n"], p["clear"], p["vague"], p["offtopic"]), row["gold"], row["id"])
+            self.assertEqual(quality.level_of(p["n"], p["given"], p["offtopic"]), row["gold"], row["id"])
 
-    #: (asked, clear, vague) -> level: the principal's blind-read cases and the edges of the rule.
+    #: (asked, given) -> level: the principal's blind-read cases and the edges of the rule.
     LEVELS = [
-        ((5, 5, 0), 3), ((3, 3, 0), 3),
-        ((5, 4, 0), 2), ((4, 3, 0), 2),            # one of four/five missing: still level 2
-        ((5, 4, 1), 2), ((4, 3, 1), 2), ((3, 2, 1), 2),   # one vague, nothing missing
-        ((3, 2, 0), 1),                            # two of three given: a third of the task missing
-        ((4, 2, 0), 1), ((5, 3, 0), 1), ((3, 1, 0), 1),  # half or less given
-        ((4, 2, 2), 1), ((3, 1, 2), 1), ((4, 2, 1), 1),  # two defects
+        ((3, 3), 3), ((4, 4), 3), ((5, 5), 3),
+        ((4, 3), 2), ((5, 4), 2),                   # one short of four or five: still mostly done
+        ((3, 1), 1), ((4, 1), 1), ((4, 2), 1), ((5, 1), 1), ((5, 2), 1),   # at most half
     ]
+    NEVER = [(3, 2), (5, 3)]                        # in-between shares: borderline to a reader, never generated
 
     def test_level_table_holds_for_reference_and_generator(self):
-        for (n, c, v), want in self.LEVELS:
-            self.assertEqual(reference_level(n, c, v), want, (n, c, v))
-            self.assertEqual(quality.level_of(n, c, v, False), want, (n, c, v))
+        for (n, g), want in self.LEVELS:
+            self.assertEqual(reference_level(n, g), want, (n, g))
+            self.assertEqual(quality.level_of(n, g, False), want, (n, g))
+        for n in (3, 4, 5):
+            self.assertEqual(quality.level_of(n, 0, True), 0)
 
-    def test_three_of_four_is_level_two_and_two_of_three_is_level_one(self):
-        # the blind re-label's rows: aq-0056 (4 of 5), aq-0126, aq-0177, aq-0363 (3 of 4), aq-0385 (4 of 5) are 2
-        for n, c in ((5, 4), (4, 3)):
-            self.assertEqual(quality.level_of(n, c, 0, False), 2)
-        self.assertEqual(quality.level_of(3, 2, 0, False), 1)
+    def test_in_between_shares_are_refused_and_never_generated(self):
+        for n, g in self.NEVER:
+            with self.assertRaises(ValueError):
+                quality.level_of(n, g, False)
+            with self.assertRaises(AssertionError):
+                reference_level(n, g)
         for row, p in disk_rows_with_params("eval.answer_quality"):
-            if p["offtopic"]:
-                continue
-            defects = p["n"] - p["clear"]
+            self.assertNotIn((p["n"], p["given"]), self.NEVER, row["id"])
+            if row["gold"] == 2:
+                self.assertTrue(p["n"] >= 4 and p["given"] == p["n"] - 1, row["id"])
+            if row["gold"] == 1:
+                self.assertTrue(1 <= p["given"] and 2 * p["given"] <= p["n"], row["id"])
             if row["gold"] == 3:
-                self.assertEqual(defects, 0, row["id"])
-            elif row["gold"] == 2:
-                self.assertEqual(defects, 1, row["id"])
-                self.assertTrue(p["n"] >= 4 or p["vague"] == 1, row["id"])
-            elif row["gold"] == 1:
-                self.assertGreaterEqual(p["clear"], 1, row["id"])
-                self.assertTrue(defects >= 2 or (defects == 1 and p["n"] == 3 and p["vague"] == 0), row["id"])
+                self.assertEqual(p["given"], p["n"], row["id"])
 
     def test_level_rule_rejects_what_the_spec_does_not_define(self):
         with self.assertRaises(ValueError):
-            quality.level_of(4, 0, 2, False)      # nothing correct, not off-topic
+            quality.level_of(4, 0, False)      # nothing given but not off-topic
         with self.assertRaises(ValueError):
-            quality.level_of(3, 2, 2, False)      # more items than asked
-        with self.assertRaises(ValueError):
-            quality.level_of(5, 1, 3, False)      # three vague
+            quality.level_of(3, 4, False)      # more items than asked
+
+    def test_no_vague_wording_is_generated(self):
+        vague_markers = ("perhaps", "i guess", "sort of", "somehow", "i think", "more or less", "some kind of", "something to do with")
+        for row, p in disk_rows_with_params("eval.answer_quality"):
+            ans = row["state"]["final_answer"].lower()
+            if row["gold"] != 0:
+                for m in vague_markers:
+                    self.assertNotIn(m, ans, row["id"])
+                self.assertEqual(len(p["answer_items"]), p["given"], row["id"])
 
     def test_word_count_does_not_track_the_level(self):
         rows = disk_rows_with_params("eval.answer_quality")
