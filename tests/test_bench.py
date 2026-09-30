@@ -247,7 +247,7 @@ class GroupingAndProducers(unittest.TestCase):
 
 # ---------------------------------------------------------------- run.py ---
 
-KEY = "sk-test-SECRET-0123456789"
+KEY = "fake-key-SECRET-0123456789"
 
 
 class FakeTypryx(ThreadingHTTPServer):

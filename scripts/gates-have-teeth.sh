@@ -9,9 +9,11 @@
 #   no-group-leak            plant a group in two splits    repeat a row inside a split   rm dev.jsonl
 #   labels-by-construction   flip one gold label            edit the manifest's commit    rm all.jsonl
 #   no-jev                   plant the vendor URL           plant "type safe" (two words) rm the data
+#   no-secrets               plant a token in a file, or    a short fake key; the named   no tracked files
+#                            commit one and delete it       historical fake literal
 #
 # The fault strings are assembled from pieces so this file does not contain
-# the pattern no-jev.sh looks for.
+# the patterns no-jev.sh and no-secrets.sh look for.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$(mktemp -d)"
@@ -94,6 +96,33 @@ expect "the vendor URL planted in gen/" fail "$d" no-jev
 d="$(fresh nj-nonfault)"; printf '# keep the answers type safe, in two words\n' > "$d/gen/notes.py"
 expect "\"type safe\" in two words (not a fault)" pass "$d" no-jev
 d="$(fresh nj-missing)"; rm -r "$d/data";                        expect "data/ missing" nothing "$d" no-jev
+
+# ----------------------------------------------------------------- no-secrets
+gitfresh() {  # gitfresh COPY_NAME -> a fresh copy of the repo as a one-commit git repo
+  local d; d="$(fresh "$1")"
+  git -C "$d" init -q -b main
+  git -C "$d" add -A
+  git -C "$d" -c user.name=teeth -c user.email=teeth@example.invalid commit -q -m "copy"
+  echo "$d"
+}
+commit_all() {  # commit_all DIR MESSAGE
+  git -C "$1" add -A
+  git -C "$1" -c user.name=teeth -c user.email=teeth@example.invalid commit -q -m "$2"
+}
+fake_token="ghp_""0123456789abcdefghij0123"      # GitHub-token shape, not a real token
+d="$(gitfresh ns-clean)"; expect "untouched repo" pass "$d" no-secrets
+d="$(gitfresh ns-fault)"; printf 'TOKEN = "%s"\n' "$fake_token" > "$d/gen/planted_notes.py"; commit_all "$d" plant
+expect "a token-shaped string in a tracked file" fail "$d" no-secrets
+d="$(gitfresh ns-history)"; printf 'TOKEN = "%s"\n' "$fake_token" > "$d/gen/planted_notes.py"; commit_all "$d" plant
+rm "$d/gen/planted_notes.py"; commit_all "$d" remove
+expect "a token committed and deleted (history)" fail "$d" no-secrets
+d="$(gitfresh ns-nonfault)"; printf 'KEY = "sk-short"\n' > "$d/gen/notes.py"; commit_all "$d" short
+expect "a short fake key (not a fault)" pass "$d" no-secrets
+d="$(gitfresh ns-known)"; printf 'KEY = "%s"\n' "sk-""test-SECRET-0123456789" > "$d/gen/notes.py"; commit_all "$d" known
+rm "$d/gen/notes.py"; commit_all "$d" remove
+expect "the named historical fake literal (not a fault)" pass "$d" no-secrets
+d="$(fresh ns-missing)"; git -C "$d" init -q -b main
+expect "no tracked files" nothing "$d" no-secrets
 
 echo
 if [ "$fails" -eq 0 ]; then

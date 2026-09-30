@@ -2,9 +2,10 @@
 # Gate: nothing in this repository calls, names or reads the output of the
 # third-party typed-answer service whose terms forbid training another model
 # on it. Truth here comes from construction only. The gate scans every file in
-# the repo (git metadata excluded). Two files may mention the pattern: this
-# gate, which holds the pattern list, and SPEC.md, the statement of the
-# prohibition itself. The gate's own name contains the pattern, so the token
+# the repo (git metadata excluded). Three files may mention the pattern: this
+# gate, which holds the pattern list, and SPEC.md and README.md, the statements
+# of the prohibition itself (README.md also names the backend whose results
+# the Results table reports). The gate's own name contains the pattern, so the token
 # "no-jev" is blanked before matching and mentioning the gate is not a hit.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -12,7 +13,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Case-insensitive substrings: the vendor's name, its API host, the backend
 # name and any key path or variable built on it all contain one of these.
 PATTERNS=('typesafe' 'jev')
-ALLOW=('SPEC.md' 'scripts/no-jev.sh')
+ALLOW=('SPEC.md' 'README.md' 'scripts/no-jev.sh')
 
 if [ ! -s "$ROOT/data/all.jsonl" ]; then
   echo "no-jev: measured nothing ($ROOT/data/all.jsonl is missing or empty)"
