@@ -1,50 +1,45 @@
 """Family 2: triage.anomaly_class.
 
-Each row starts from numeric scenario parameters, the label is a deterministic
-function of them (`classify`), and the parameters are RENDERED as operator
-text by one of many rendering styles (the row's group). Every style can render
-every label, so the group carries no label information; the model has to read
-the numbers.
+Only CLEAR-CUT scenarios are generated: a careful reader should not be able to
+reasonably pick another label. Each row starts from numeric scenario
+parameters, the label is a deterministic function of them (`classify`), and
+the parameters are RENDERED as operator text by one of many rendering styles
+(the row's group). Every style can render every label, so the group carries no
+label information; the model has to read the numbers.
 
 Parameters (percent deltas against the prior period unless noted):
 
-    spend    headline spend change (shown; fixes the size of the cost increase)
-    calls    change in call count, or None if not known
+    spend    headline spend change (derived from calls, price and any per-call factor)
+    calls    change in call count, or None if not stated
     traffic  change in real end-user traffic, or None
     unique   share of requests with a distinct prompt, 0..100, or None
     price    change in unit price, or None
-    event    "none" | "noise" | "agent_deploy" | a SETTING_EVENTS kind
+    event    "none" | "noise" (an unrelated change) | a SETTING_EVENTS kind
 
-The rule (amended after a blind re-label: "several classes match -> unknown"
-was wrong when one cause clearly dominates): split the cost increase into the
-share each candidate cause explains, on a log scale so that calls x price
-multiply into the spend. With L(x) = ln(1 + x/100), T = L(spend):
+"flat" = within +-10 percent (price: +-5). The rules (amended twice after blind
+re-labels; there is no dominance arithmetic, no mixing of causes, no gray zone):
 
-    growth    min(L(traffic)+, L(calls)+)         demand grew and calls followed
-    runaway   L(calls)+ - growth                  calls beyond what demand explains
-    price     L(price)+                           the unit price rose
-    config    max(0, T - L(calls)+ - L(price)+)   cost per call rose for no other reason
+    expected_growth   calls and real traffic both up (>= +20) within 10 points of
+                      each other; price flat; unique >= 50 if stated; no setting change
+    runaway_agent     prompts are mostly repeats (unique <= 25, stated); price flat; no
+                      setting change; and either traffic is stated and calls are up
+                      >= +100 and >= 3x traffic's growth, or traffic is not stated and
+                      calls are up >= +400 (5x)
+    price_change      calls and traffic flat, unit price up >= +15; unique >= 40 if
+                      stated; no setting change
+    misconfiguration  a setting, quota, cap, routing or model change is recorded (an
+                      intentional one counts) and it is the only thing that changed:
+                      calls, traffic and price flat or not stated; unique >= 40 if stated
+    unknown           spend is up but nothing informative is given: no call, traffic,
+                      price or prompt figures, and no change beyond unrelated ones
 
-(+ = the positive part). A share is its amount divided by D = max(T, sum of the
-known amounts); an amount whose inputs are unknown is not computed, so a cause
-can only claim a share it can demonstrate. A cause WINS when its share is at
-least DOM = 3/4 of the increase (one cause explains most of it), and:
-
-    expected_growth   share >= 3/4 and (prompts are not mostly repeats: unique >= 50, if known)
-    runaway_agent     share >= 3/4 and unique <= 25 (repeats shown: needed evidence)
-    misconfiguration  share >= 3/4 and a setting event is present
-    price_change      share >= 3/4
-
-The label is the single winning cause, else `unknown`: no cause dominates
-(comparable causes), an amount cannot be computed (insufficient data), or the
-evidence contradicts the cause (e.g. extra calls but diverse prompts).
-`unknown` rows are built on purpose in those flavours, and every row keeps each
-share at least 0.03 away from the 3/4 bar so a reader is not asked to split hairs.
+A parameter set that fits none of these (mixed causes, contradictions, a missing
+figure next to otherwise decisive data) has no label: `classify` returns None
+and the generator never draws one. The tests check both.
 """
 
 from __future__ import annotations
 
-import math
 import random
 
 from .common import ROWS_PER_FAMILY, Case, finalize, rng_for, spread
@@ -56,60 +51,40 @@ LABELS = ["expected_growth", "runaway_agent", "misconfiguration", "price_change"
 
 SETTING_EVENTS = ["cache_disabled", "max_tokens_raised", "model_route_changed", "quota_raised", "rate_limit_removed", "context_cap_raised"]
 QUIET_EVENTS = ["none", "noise"]
-RUNAWAY_OK_EVENTS = ["none", "noise", "agent_deploy"]
-ALL_EVENTS = ["none", "noise", "agent_deploy"] + SETTING_EVENTS
-
-#: A cause wins when it explains at least this share of the cost increase.
-DOM = 0.75
-MARGIN = 0.03
+ALL_EVENTS = QUIET_EVENTS + SETTING_EVENTS
 
 
 # ---------------------------------------------------------------- the label
 
-def _L(x: float) -> float:
-    return math.log(1 + x / 100)
+def _flat(x):
+    return x is not None and -10 <= x <= 10
 
 
-def shares(p: dict) -> dict:
-    """Each candidate cause's share of the cost increase, or None where its
-    inputs are not known."""
-    T = _L(p["spend"])
-    c, t, pr = p["calls"], p["traffic"], p["price"]
-    kp = None if c is None else max(_L(c), 0.0)
-    g = None if t is None else (_L(t) if t > 0 else 0.0)
-    price = None if pr is None else (_L(pr) if pr > 0 else 0.0)
-    growth = runaway = None
-    if kp is not None and g is not None:
-        growth = min(g, kp)
-        runaway = kp - growth
-    config = None if kp is None or price is None else max(0.0, T - kp - price)
-    known = (kp if growth is None and kp is not None else 0.0) + (growth or 0.0) + (runaway or 0.0) + (price or 0.0) + (config or 0.0)
-    D = max(T, known)
-    return {k: (None if v is None else v / D) for k, v in
-            (("growth", growth), ("runaway", runaway), ("price", price), ("config", config))}
+def _price_flat(x):
+    return x is not None and -5 <= x <= 5
 
 
-def winners(p: dict) -> list[str]:
-    s, u, e = shares(p), p["unique"], p["event"]
-    out = []
-    if s["growth"] is not None and s["growth"] >= DOM and (u is None or u >= 50):
-        out.append("expected_growth")
-    if s["runaway"] is not None and s["runaway"] >= DOM and u is not None and u <= 25:
-        out.append("runaway_agent")
-    if s["config"] is not None and s["config"] >= DOM and e in SETTING_EVENTS:
-        out.append("misconfiguration")
-    if s["price"] is not None and s["price"] >= DOM:
-        out.append("price_change")
-    return out
-
-
-def classify(p: dict) -> str:
-    w = winners(p)
-    return w[0] if len(w) == 1 else "unknown"
-
-
-def _clear_of_bar(p: dict) -> bool:
-    return all(v is None or abs(v - DOM) > MARGIN for v in shares(p).values())
+def classify(p: dict):
+    """The label of a parameter set, or None if it is not a clear-cut case."""
+    c, t, u, pr, e = p["calls"], p["traffic"], p["unique"], p["price"], p["event"]
+    if e in SETTING_EVENTS:
+        if (c is None or _flat(c)) and (t is None or _flat(t)) and (pr is None or _price_flat(pr)) and (u is None or u >= 40):
+            return "misconfiguration"
+        return None
+    if e not in QUIET_EVENTS:
+        return None
+    if c is None and t is None and u is None and pr is None:
+        return "unknown"
+    if c is not None and t is not None and pr is not None and c >= 20 and t >= 20 and abs(c - t) <= 10 and _price_flat(pr) and (u is None or u >= 50):
+        return "expected_growth"
+    if c is not None and u is not None and u <= 25 and _price_flat(pr):
+        if t is not None and c >= 100 and c >= 3 * max(t, 0):
+            return "runaway_agent"
+        if t is None and c >= 400:
+            return "runaway_agent"
+    if c is not None and t is not None and pr is not None and _flat(c) and _flat(t) and pr >= 15 and (u is None or u >= 40):
+        return "price_change"
+    return None
 
 
 # ------------------------------------------------------------ parameter draw
@@ -127,105 +102,50 @@ def _rint(rng, lo, hi):
     return rng.randint(lo, hi)
 
 
-def _with_spend(rng, p: dict, cfg: float = 1.0) -> dict:
+def _with_spend(p: dict, cfg: float = 1.0) -> dict:
     """The headline spend follows from the true calls, price and per-call
     factor, so the numbers a reader sees reconcile."""
-    c, pr = p["calls"], p["price"]
-    p["spend"] = round(100 * ((1 + c / 100) * (1 + pr / 100) * cfg - 1))
+    p["spend"] = round(100 * ((1 + p["calls"] / 100) * (1 + p["price"] / 100) * cfg - 1))
     return p
 
 
-def _draw_full(rng, cls: str) -> tuple[dict, list[str]]:
-    """Every true value, inside one class's region; returns the params and the
-    signals that may be hidden without changing the verdict."""
-    if cls == "expected_growth":
+def draw_scenario(rng, label: str) -> dict:
+    """Parameters well inside one class's region (away from every threshold)."""
+    if label == "expected_growth":
         t = _rint(rng, 30, 260)
-        p = dict(traffic=t, calls=t + _rint(rng, -10, 10), price=_rint(rng, -4, 4), unique=_rint(rng, 55, 95), event=rng.choice(QUIET_EVENTS))
-        return _with_spend(rng, p), ["price", "unique"]
-    if cls == "runaway_agent":
-        c = int(100 * 10 ** rng.uniform(0, 1.2))
-        p = dict(calls=c, traffic=_rint(rng, -8, 8), unique=_rint(rng, 2, 22), price=_rint(rng, -4, 4), event=rng.choice(RUNAWAY_OK_EVENTS))
-        return _with_spend(rng, p), ["price"]
-    if cls == "price_change":
-        p = dict(price=_rint(rng, 20, 150), calls=_rint(rng, -6, 6), traffic=_rint(rng, -8, 8), unique=_rint(rng, 40, 95), event=rng.choice(QUIET_EVENTS))
-        return _with_spend(rng, p), ["traffic", "unique"]
-    if cls == "misconfiguration":
-        p = dict(event=rng.choice(SETTING_EVENTS), traffic=_rint(rng, -8, 8), price=_rint(rng, -4, 4), unique=_rint(rng, 40, 95), calls=_rint(rng, -5, 15))
-        return _with_spend(rng, p, cfg=rng.uniform(1.8, 4.5)), ["traffic", "unique"]
-    raise ValueError(cls)
-
-
-def _draw_base(rng, cls: str) -> dict:
-    p, optional = _draw_full(rng, cls)
-    if rng.random() < 0.3:
-        p[rng.choice(optional)] = None
-    return p
-
-
-#: Signals whose absence stops each class's verdict (so hiding one makes the
-#: row `unknown` for lack of data).
-NEEDED = {"expected_growth": ["traffic", "calls"], "runaway_agent": ["traffic", "unique", "calls"],
-          "price_change": ["price"], "misconfiguration": ["calls", "price"]}
-
-
-def _draw_unknown(rng) -> dict:
-    """Flavours of `unknown`: data needed for a verdict is hidden, comparable
-    causes, evidence that contradicts its own cause, a gray zone, a spend that
-    does not reconcile with anything shown, and a bare headline."""
-    flavour = rng.choice(["hidden", "hidden", "comparable", "comparable", "contradict", "contradict", "gray", "unreconciled", "blank"])
-    if flavour == "hidden":
-        base = rng.choice(list(NEEDED))
-        p, _ = _draw_full(rng, base)
-        for k in rng.sample(NEEDED[base], rng.choice([1, 1, 2]) if len(NEEDED[base]) > 1 else 1):
-            p[k] = None
-        if rng.random() < 0.4:
-            p[rng.choice(["price", "unique", "calls", "traffic"])] = None
+        p = dict(traffic=t, calls=t + _rint(rng, -6, 6), price=_rint(rng, -3, 3), unique=_rint(rng, 58, 95), event=rng.choice(QUIET_EVENTS))
+        if rng.random() < 0.25:
+            p["unique"] = None
+        return _with_spend(p)
+    if label == "runaway_agent":
+        p = dict(calls=int(150 * 10 ** rng.uniform(0, 1.0)), traffic=_rint(rng, -5, 8), unique=_rint(rng, 2, 18), price=_rint(rng, -3, 3), event=rng.choice(QUIET_EVENTS))
+        if rng.random() < 0.3:          # traffic not stated: the jump must be very large
+            p["calls"] = int(450 * 10 ** rng.uniform(0, 0.55))
+            _with_spend(p)
+            p["traffic"] = None
+            return p
+        return _with_spend(p)
+    if label == "price_change":
+        p = dict(price=_rint(rng, 25, 150), calls=_rint(rng, -6, 6), traffic=_rint(rng, -6, 6), unique=_rint(rng, 55, 95), event=rng.choice(QUIET_EVENTS))
+        if rng.random() < 0.25:
+            p["unique"] = None
+        return _with_spend(p)
+    if label == "misconfiguration":
+        p = dict(event=rng.choice(SETTING_EVENTS), traffic=_rint(rng, -6, 6), price=_rint(rng, -3, 3), unique=_rint(rng, 55, 95), calls=_rint(rng, -6, 6))
+        _with_spend(p, cfg=rng.uniform(1.8, 4.5))
+        for k in ("calls", "traffic", "price", "unique"):   # any of the figures may simply not be stated
+            if rng.random() < 0.35:
+                p[k] = None
         return p
-    if flavour == "comparable":
-        kind = rng.choice(["growth_price", "runaway_price", "growth_config", "runaway_config"])
-        if kind == "growth_price":
-            t = _rint(rng, 40, 120)
-            p = dict(traffic=t, calls=t + _rint(rng, -5, 5), price=_rint(rng, 30, 70), unique=_rint(rng, 55, 90), event="none")
-            return _with_spend(rng, p)
-        if kind == "runaway_price":
-            p = dict(calls=_rint(rng, 120, 320), traffic=_rint(rng, -4, 4), unique=_rint(rng, 4, 20), price=_rint(rng, 50, 150), event="none")
-            return _with_spend(rng, p)
-        if kind == "growth_config":
-            t = _rint(rng, 40, 120)
-            p = dict(traffic=t, calls=t + _rint(rng, -5, 5), price=_rint(rng, -3, 3), unique=_rint(rng, 55, 90), event=rng.choice(SETTING_EVENTS))
-            return _with_spend(rng, p, cfg=rng.uniform(1.4, 2.4))
-        p = dict(calls=_rint(rng, 120, 320), traffic=_rint(rng, -4, 4), unique=_rint(rng, 4, 20), price=_rint(rng, -3, 3), event=rng.choice(SETTING_EVENTS))
-        return _with_spend(rng, p, cfg=rng.uniform(1.6, 3.5))
-    if flavour == "contradict":
-        kind = rng.choice(["runaway_diverse", "growth_repeats"])
-        if kind == "runaway_diverse":   # far more calls than demand, but the prompts are all different
-            p = dict(calls=_rint(rng, 120, 900), traffic=_rint(rng, -6, 6), unique=_rint(rng, 55, 90), price=_rint(rng, -3, 3), event="none")
-        else:                           # calls track demand, but the prompts are mostly repeats
-            t = _rint(rng, 40, 200)
-            p = dict(traffic=t, calls=t + _rint(rng, -8, 8), unique=_rint(rng, 3, 20), price=_rint(rng, -3, 3), event="none")
-        return _with_spend(rng, p)
-    if flavour == "gray":
-        p = dict(calls=_rint(rng, 15, 60), traffic=_rint(rng, 8, 25), unique=_rint(rng, 26, 49), price=_rint(rng, 3, 12), event=rng.choice(QUIET_EVENTS))
-        _with_spend(rng, p)
-        for k in rng.sample(["calls", "traffic", "unique", "price"], rng.choice([0, 0, 1])):
-            p[k] = None
-        return p
-    if flavour == "unreconciled":       # a large increase that nothing shown accounts for
-        p = dict(calls=_rint(rng, -5, 6), traffic=_rint(rng, -6, 8), unique=_rint(rng, 50, 90), price=_rint(rng, -3, 3), event=rng.choice(QUIET_EVENTS))
-        p["spend"] = _rint(rng, 80, 400)
-        return p
-    p = dict(calls=None, traffic=None, unique=None, price=None, event=rng.choice(ALL_EVENTS))   # blank
-    p["spend"] = _rint(rng, 25, 400)
-    return p
+    if label == "unknown":
+        return dict(calls=None, traffic=None, unique=None, price=None, event=rng.choice(QUIET_EVENTS), spend=_rint(rng, 25, 400))
+    raise ValueError(label)
 
 
 def draw_params(rng: random.Random, label: str) -> dict:
-    for _ in range(2000):
-        p = _draw_unknown(rng) if label == "unknown" else _draw_base(rng, label)
-        if classify(p) == label and _clear_of_bar(p):
-            break
-    else:
-        raise RuntimeError(f"cannot draw parameters for {label}")
+    p = draw_scenario(rng, label)
+    if classify(p) != label:
+        raise RuntimeError(f"drew {label} parameters that classify as {classify(p)}: {p}")
     p["project"] = rng.choice(PROJECTS)
     p["window"] = rng.choice(WINDOWS)
     p["big"], p["small"] = rng.choice(MODELS_BIG), rng.choice(MODELS_SMALL)

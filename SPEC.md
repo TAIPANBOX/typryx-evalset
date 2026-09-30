@@ -45,19 +45,27 @@ model; nothing in this repo may call Jev or read Jev output).
    price_change/unknown; fields `anomaly`, `recent_changes`). Generate from numeric
    scenario parameters (calls delta, unique-request ratio, unit price delta, traffic
    delta, a config event or none) and RENDER them as operator-style text; the label is a
-   deterministic function of the parameters. `unknown` = parameters deliberately
-   insufficient or contradictory. 100 each.
+   deterministic function of the parameters. 100 each. Only CLEAR-CUT scenarios are
+   generated (amended after two blind re-labels): expected_growth = calls and real
+   traffic both up within 10 points of each other, price flat, unique ratio >= 0.5
+   when stated, no setting change; runaway_agent = calls >= 3x traffic's growth with
+   unique <= 0.25, price flat, no setting change (traffic not stated: calls >= 5x);
+   price_change = calls and traffic flat, unit price >= +15; misconfiguration = a
+   setting/quota/cap/routing/model change (intentional ones count) is the only thing
+   that changed, other figures flat or not stated; unknown = spend up and no
+   informative evidence at all (only unrelated changes, no call, traffic, price or
+   prompt figures). Mixed causes, contradictions and gray zones are never generated.
 3. `eval.outcome_met` (noul; fields `task`, `final_answer`). Checkable tasks: arithmetic
    (+,-,x), unit conversion, weekday of a given date, counting items in a list, string
    ops (reverse, uppercase, letter count), sorting a short list. Right answer or a
    plausible near miss, guaranteed different. 250 true / 250 false, balanced per task kind.
 4. `eval.answer_quality` (score 0..3; fields `task`, `final_answer`). Tasks that ask for
    N concrete items or steps (e.g. "List four causes of X", "Give three steps to Y") with
-   a fixed fact bank per task; answer built at a level: 3 = all N items present,
-   correct and clear; 2 = all N items present, exactly one of them vague (a missing
-   item is never level 2); 1 = one or more items missing but at least one correct item
-   given; 0 = off-topic answer. 125 per level. (Amended after a blind re-label: the
-   earlier wording scored "all but one item" as 2.)
+   a fixed fact bank per task; answer built at a level by the share of the task
+   done (defects = missing items + vague items): 3 = no defects; 2 = exactly one
+   defect and N >= 4, or exactly one vague item (none missing) when N = 3; 1 = at
+   least one correct clear item but more defects than level 2 allows; 0 = off-topic
+   answer. 125 per level. (Amended after two blind re-labels.)
 5. `action.risk_class` (NEW, choice; fields `tool`, `arguments`, `target`). Classifies an
    agent's pending tool call for a Wardryx policy signal. Options and criteria:
    - `read_only`: reads or lists data, changes nothing

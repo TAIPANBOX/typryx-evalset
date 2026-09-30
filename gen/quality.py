@@ -5,9 +5,10 @@ has a fixed fact bank: six facts, each with a CLEAR wording and a VAGUE one.
 The answer is built at a level, and the level is a pure function of how the
 answer was built (`level_of`):
 
-    3  all N items present and clear
-    2  all N items present, exactly one of them vague (never a missing item)
-    1  one or more items missing, at least one correct item given
+    defects = missing items + vague items (N - clear items)
+    3  no defects
+    2  exactly one defect and N >= 4, or exactly one vague item (none missing) when N = 3
+    1  at least one correct clear item, but more defects than level 2 allows
     0  off-topic: items from another topic, or a non-answer
 
 A group is one topic (its task phrasing and fact bank). Every topic renders
@@ -296,21 +297,27 @@ INTRO_P = 0.5
 
 
 def level_of(n_asked: int, clear: int, vague: int, offtopic: bool) -> int:
-    """The scoring rule, stated independently of how an answer is rendered.
+    """The scoring rule: how much of the task is done.
 
-    3: all N items present and clear. 2: all N items present, exactly one of
-    them vague (a missing item is NEVER level 2). 1: one or more items
-    missing, at least one correct item given. 0: off-topic."""
+    Defects = missing items + vague items (= N - clear items).
+    3: no defects. 2: exactly one defect, and either N >= 4 (one item missing
+    or one vague) or N = 3 with that one defect a vague item (nothing
+    missing). 1: at least one correct clear item but more defects than level 2
+    allows (for example 2 of 3 given, 2 of 4 given, or a missing item out of
+    only three). 0: off-topic, no requested item given."""
     if offtopic:
         return 0
-    if clear + vague == n_asked:
-        if vague == 0:
-            return 3
-        if vague == 1:
-            return 2
-    elif vague == 0 and 1 <= clear < n_asked:
-        return 1
-    raise ValueError(f"no level for asked={n_asked} clear={clear} vague={vague}")
+    if clear < 1:
+        raise ValueError(f"no level for asked={n_asked} clear={clear} vague={vague}")
+    missing = n_asked - clear - vague
+    if missing < 0 or vague > 2:
+        raise ValueError(f"no level for asked={n_asked} clear={clear} vague={vague}")
+    defects = missing + vague
+    if defects == 0:
+        return 3
+    if defects == 1 and (n_asked >= 4 or (vague == 1 and missing == 0)):
+        return 2
+    return 1
 
 
 def groups() -> list[str]:
@@ -379,12 +386,17 @@ def generate(seed: int) -> list[Case]:
                         chosen = [bank[i][0] for i in order[:n]]
                         clear_n = n
                     elif level == 2:
-                        chosen = [bank[i][0] for i in order[:n - 1]] + [bank[order[n - 1]][1]]
-                        clear_n, vague_n = n - 1, 1
+                        clear_n, vague_n = (2, 1) if n == 3 else (n - 1, rng.choice([0, 1]))
+                        chosen = [bank[i][0] for i in order[:clear_n]] + [bank[i][1] for i in order[clear_n:clear_n + vague_n]]
                         rng.shuffle(chosen)
                     elif level == 1:
-                        clear_n = rng.randint(1, n - 1)
-                        chosen = [bank[i][0] for i in order[:clear_n]]
+                        if n == 3:
+                            clear_n, vague_n = rng.choice([(2, 0), (1, 0), (1, 1), (1, 2)])
+                        else:
+                            clear_n = rng.randint(1, n - 2)
+                            vague_n = rng.randint(0, min(2, n - clear_n))
+                        chosen = [bank[i][0] for i in order[:clear_n]] + [bank[i][1] for i in order[clear_n:clear_n + vague_n]]
+                        rng.shuffle(chosen)
                     else:
                         offtopic = True
                         if rng.random() < 0.7:
