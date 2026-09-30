@@ -1,0 +1,14 @@
+{
+  "id": "console.question_topic",
+  "type": "choice",
+  "instructions": "Route the operator's question in `question` to the data source that should answer it.",
+  "criteria": {
+    "spend": "cost, budget, invoices, or token spend",
+    "incident": "outages, errors, alerts, or degraded service",
+    "identity": "agent identities, keys, credentials, suspicious logins, or delegation",
+    "approval": "pending approvals, holds, or who must sign off",
+    "other": "anything else, including a general how-to or small talk"
+  },
+  "fields": ["question"],
+  "max_state_bytes": 16384
+}
