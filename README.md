@@ -168,9 +168,8 @@ rules of that kind would do on real operator text, not a typical result.
 ## The CPU VM recipe
 
 `vm/setup.sh` is the script used to stand up the machine for the local-model run: Debian
-12 on an 8-vCPU machine, Docker, Ollama with `qwen2.5:7b`, every server bound to
-`127.0.0.1` so nothing listens on a public interface. It also installs two further local
-typed-decision servers that are not part of the results below. Read it before running
+12 on an 8-vCPU machine, Ollama with `qwen2.5:7b`, bound to `127.0.0.1` so nothing
+listens on a public interface. Read it before running
 it: it installs packages and pulls model weights, and it is meant for a throwaway VM, not
 your workstation.
 
@@ -178,13 +177,13 @@ your workstation.
 
 Measured 2026-09-30 on the frozen test split (434 rows, sha256 above). Overall accuracy
 with a 95% Wilson interval, expected calibration error (lower is better), and p50
-latency. One run per row of the table.
+latency as typryx itself measured it per ask (`latency_ms`). One run per row of the table.
 
 | Backend | Accuracy | 95% interval | ECE | p50 latency | Where it ran |
 |---|---|---|---|---|---|
 | constant (no model) | 25.1% | [21.3, 29.4] | 0.749 | n/a | locally, `baseline/predict.py` |
 | rules (no model) | 82.3% | [78.4, 85.6] | 0.177 | n/a | locally, `baseline/predict.py` |
-| typryx + hosted typed-decision service | 87.1% | [83.6, 89.9] | 0.042 | 229 ms | hosted service, called from a developer laptop |
+| typryx + Jev (TypeSafe AI, `jev-1.13.0`) | 87.1% | [83.6, 89.9] | 0.042 | 229 ms | hosted service, called from a developer laptop |
 | typryx + qwen2.5:7b via Ollama | 70.0% | [65.6, 74.2] | 0.273 | 2130 ms | 8-vCPU CPU VM (n2-standard-8), model on the VM's loopback |
 
 How to read it:
@@ -248,7 +247,6 @@ to beat. Keep the test split out of any tuning, or its number stops meaning anyt
   it, or on a model that saw this repository, makes its own result here meaningless.
 - **Downstream value.** That a better typed answer improves an agent's outcome, or lowers
   its cost, is not measured. Cost figures are not part of the table.
-- **The other two local servers** that `vm/setup.sh` installs are not reported here.
 
 ## Layout
 
