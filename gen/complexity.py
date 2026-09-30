@@ -40,8 +40,21 @@ REASONING_CUES = re.compile(
 #: politeness and length carry no label information.
 PREFIXES = ["Hey, ", "Hi - ", "Quick one: ", "Sorry to bother you, ", "Morning! ", "Hello, ", "One thing: ", "Could you help? "]
 SUFFIXES = [" Thanks!", " Appreciate it.", " Cheers.", " Thank you.", " Much appreciated.", " Thanks in advance."]
+#: Longer, chatty context sentences, also applied to every class with the same
+#: probability so that a short ask is not always a short prompt.
+PREAMBLES = [
+    "I'm putting together a slide deck for our weekly sync and I'm a bit short on time. ",
+    "My manager asked me about this earlier and I want to get it right. ",
+    "Context: this is for an internal wiki page that new joiners read in their first week. ",
+    "We had a long thread about this yesterday and nobody wrote down the answer. ",
+    "I'm on call this week and trying to clear my queue before the handover. ",
+    "This is for a document that finance and engineering will both read. ",
+    "I've been staring at this for a while and would appreciate a fresh pair of eyes. ",
+    "Background: our team is small, we move quickly, and we keep notes in a shared folder. ",
+]
 WRAP_PREFIX_P = 0.25
 WRAP_SUFFIX_P = 0.25
+WRAP_PREAMBLE_P = 0.22
 
 COUNTRIES = ["Australia", "Canada", "Kenya", "Norway", "Peru", "Vietnam", "Portugal", "Chile", "Egypt", "Poland",
              "Thailand", "Argentina", "Ireland", "Morocco", "New Zealand", "Finland", "Ghana", "Malaysia"]
@@ -174,6 +187,20 @@ PROOFREAD = [
     "The new release includes several improvements, such as faster load times, better error messages, and also it fixes a bug that caused exports to fail sometimes.",
 ]
 
+NOTES = [
+    "we agreed to move the launch to the 14th; Sam will own the migration runbook; finance needs the vendor quote by Friday; support wants a macro for the new refund flow; nobody has tested the export on large accounts yet; Priya is out next week so reviews go to Dev",
+    "the audit export is slow for accounts over 100k rows; Lena suggested paging the query; Omar thinks we should cache the summary table instead; we need a decision before the sprint ends; the customer success team keeps getting asked for an ETA and has none",
+    "budget alerts fire too late for the weekend batch jobs; Ana will check the thresholds; we should add an owner field to every agent; legal asked whether logs can leave the EU region; Mateo will draft the answer and send it to Kai",
+]
+JOB_DESCRIPTIONS = [
+    "We are looking for a rockstar backend ninja who can hit the ground running in a fast-paced environment. You will own services end to end, be on call for incidents, and work closely with product. Must have five or more years of experience, a degree in computer science, and the ability to thrive under pressure. Culture fit is important to us.",
+    "The ideal candidate is a self-starter with a passion for data. Responsibilities include building dashboards, running ad hoc analyses, and supporting the finance team during month end. You should be fluent in SQL, comfortable presenting to executives, and willing to work long hours when needed.",
+]
+THREADS = [
+    "Dana: The vendor says the price change starts on the 1st. Rui: That is not what the contract says, section 4 gives us 60 days notice. Dana: I checked, the notice was sent on the 3rd of last month. Rui: Then we have until the end of this month. Mina: Finance needs to know by Thursday whether to prepay. Dana: I will ask the vendor for written confirmation.",
+    "Ops: The nightly job failed twice this week. Ben: Both times it ran out of memory during the join. Ops: Can we just raise the limit? Ben: We could, but the real fix is to stop loading the whole table. Kit: I can have a patch by Wednesday. Ops: Fine, raise the limit for now and revisit after the patch ships.",
+]
+
 DEFAULT: list[tuple[str, dict]] = [
     ("Write a short, friendly email to {who} letting them know that {news}. Keep it under {n} words.",
      {"who": ["a customer", "a vendor contact", "my manager", "the whole support team", "a new client"],
@@ -196,6 +223,9 @@ DEFAULT: list[tuple[str, dict]] = [
     ("I need talking points for a {n}-minute update to {aud} about {topic}.", {"_": TALK}),
     ("Write a SQL query to {task}. The table is {table}({cols}).", {"_": SQL_TASKS}),
     ("Proofread this and suggest edits for clarity: {t}", {"t": PROOFREAD}),
+    ("Here are my notes from today's planning meeting: {n}. Turn them into a clear list of action items with owners and dates where they are mentioned.", {"n": NOTES}),
+    ("Rewrite this job description so it is more inclusive and easier to skim: {j}", {"j": JOB_DESCRIPTIONS}),
+    ("Summarize this email thread in three sentences and list any decisions that were made: {t}", {"t": THREADS}),
     ("Summarize each of these two notes in a sentence, then combine them into a short brief for the team. First note: {t} Second note: {u}",
      {"_": [{"t": PASSAGES[i], "u": PASSAGES[(i + k) % len(PASSAGES)]} for i in range(len(PASSAGES)) for k in (2, 5)]}),
 ]
@@ -269,6 +299,11 @@ HARD: list[tuple[str, dict]] = [
      {"thing": ["a cross-region replicated ledger", "an agent workflow that calls five external APIs", "a batch billing run over 40 million accounts", "a saga spanning inventory, payment and shipping"]}),
     ("Propose a zero-downtime schema change strategy for a {size} table that {serves}, including the backfill and the rollback path.",
      {"size": ["2 TB", "600 GB", "9 TB"], "serves": ["serves live checkout traffic", "is read by three downstream teams via replicas", "is written by both a legacy monolith and a new service"]}),
+    ("Why would a {thing} fail only under load, and how would you redesign it to tolerate partial failure across regions?",
+     {"thing": ["payment authorisation service", "distributed rate limiter", "agent orchestration queue", "multi-tenant search index", "ledger reconciliation job"]}),
+    ("Draft a migration and rollback strategy for splitting a {size} monolith database into per-service databases with no write downtime.", {"size": SIZES}),
+    ("We need exactly-once behaviour across a message queue and a database. What are our realistic options, and what does each one cost us operationally?", {}),
+    ("Evaluate whether we should build or buy an agent policy engine, given audit requirements, a five-person team and a two-quarter deadline.", {}),
     ("Assess the trade-offs of moving {a} to {b} in a payments stack with strict audit requirements.",
      {"_": [{"a": "a synchronous approval flow", "b": "an event-driven one"}, {"a": "self-managed Kafka", "b": "a managed streaming service"},
             {"a": "per-service databases", "b": "a shared ledger database"}, {"a": "long-lived API keys", "b": "short-lived workload credentials"}]}),
@@ -339,6 +374,16 @@ CONJECTURES = ["for every prime p greater than 3, p^2 - 1 is divisible by 24", "
                "the product of four consecutive integers is always a perfect square", "n^2 + n + 41 is prime for every non-negative integer n",
                "for all real x, (1 + x)^n >= 1 + nx when n >= 1 and x >= -1"]
 
+LONG_PUZZLES = [
+    "Six engineers, Ada, Ben, Chloe, Dev, Eli and Fay, must each be assigned one of three on-call shifts, two per shift. Ada and Ben cannot share a shift. Chloe must be on the same shift as Dev. Eli refuses the third shift. Fay must not be on the first shift. Find every valid assignment.",
+    "A warehouse has three conveyor belts feeding one packer. Belt A delivers 12 items a minute, belt B delivers 8, and belt C delivers 5, but the packer handles only 20 a minute and a queue of up to 30 items can build up. Starting from an empty queue, determine when it first overflows and what happens afterwards.",
+    "Four agents each hold a different permission: read, write, approve, or deploy. The approver never holds write. The deployer is not agent 2. Agent 1 holds neither read nor deploy. Agent 3 holds write. Work out who holds what.",
+]
+REASONING_EXTRA = [
+    ("Consider the following scheduling problem. {p} Work through it carefully, show each step of your reasoning, and check your final answer against every constraint.", {"p": LONG_PUZZLES}),
+    ("Here is a puzzle from our on-call training. {p} Solve it step by step and prove that your solution is the only one.", {"p": LONG_PUZZLES}),
+]
+
 REASONING: list[tuple[str, dict]] = [
     ("Prove that {c}. Show every step of the argument.", {"c": CLAIMS}),
     ("Derive a closed form for {s} and justify each step.", {"s": SERIES}),
@@ -354,6 +399,7 @@ REASONING: list[tuple[str, dict]] = [
     ("Carefully derive the expected value and variance of {v}, showing each algebraic step.", {"v": VARIABLES}),
     ("Is the following proof correct? {p} Check every step and point out any flaw.", {"p": PROOFS}),
     ("Prove or disprove: {c}. Give a complete formal argument.", {"c": CONJECTURES}),
+    *REASONING_EXTRA,
 ]
 
 CLASS_GROUPS = {"cheap": CHEAP, "default": DEFAULT, "hard": HARD, "reasoning": REASONING}
@@ -365,7 +411,9 @@ def groups() -> dict[str, list[str]]:
 
 
 def _wrap(text: str, rng) -> str:
-    if rng.random() < WRAP_PREFIX_P:
+    if rng.random() < WRAP_PREAMBLE_P:
+        text = rng.choice(PREAMBLES) + text
+    elif rng.random() < WRAP_PREFIX_P:
         pre = rng.choice(PREFIXES)
         text = pre + (text[0].lower() + text[1:] if pre.endswith(", ") else text)
     if rng.random() < WRAP_SUFFIX_P:
