@@ -1,26 +1,26 @@
 # typryx-evalset: spec for the stage-2 dataset
 
-Owner: the principal session. Implementer: one subagent. Private repository (local git
-only until the owner says otherwise; do NOT create a GitHub repo, do NOT push).
+The specification the generator, the splits and the gates were built to. It is the
+statement of intent; README.md is the guide to using the repository.
 
 ## Purpose
 
 A labelled set of typed questions that typryx's real consumers will ask, used to
 (1) compare typryx's backends on the SAME questions (no typryx / local model / Jev) and
-(2) fine-tune an open local model. Truth comes from construction, never from a model's
-answer, and NEVER from Jev (TypeSafe's agreement forbids using Jev output to train another
-model; nothing in this repo may call Jev or read Jev output).
+(2) give anyone who tunes their own model on their own terms a train split to tune on and
+a frozen test split to measure against. Truth comes from construction, never from a
+model's answer, and NEVER from Jev (TypeSafe's agreement forbids using Jev output to
+train another model; nothing in this repo may call Jev or read Jev output).
 
 ## Shape
 
 - Python 3 stdlib only (no pip installs). `random.Random(seed)` only; same seed gives
   byte-identical output. Tests with stdlib `unittest`.
 - `templates/*.json`: six typryx templates, same schema as
-  `~/Development/typryx/examples/templates/*.json` (copy the four existing ones verbatim,
-  add the two new ones below). Validate them with the real typryx binary if convenient:
-  `cd ~/Development/typryx && go run ./cmd/typryx templates check <dir>` (check the actual
-  subcommand name in cmd/typryx/main.go before relying on it).
-- `gen/<family>.py`: one generator per family. `gen/build.py` writes
+  `examples/templates/*.json` in the typryx repository (copy the four existing ones
+  verbatim, add the two new ones below). Validate them with the real typryx binary:
+  `go run ./cmd/typryx templates check <dir>` from a typryx checkout.
+- `gen/<family>.py`: one generator per family. `gen/build.py` (run as `python3 -m gen.build`) writes
   `data/all.jsonl`, then `data/train.jsonl`, `data/dev.jsonl`, `data/test.jsonl`, and
   `data/MANIFEST.json` (counts per family x split x label, seed, generator git commit,
   sha256 of each split file).
@@ -117,10 +117,3 @@ its template; every row's `state` keys = template fields plus at most one distra
 distractor rate 15-25%; ids unique; near-miss answers differ from the right one;
 split proportions within tolerance; each of the tests above must be run once against a
 deliberately broken generator and shown to fail (red first), then green.
-
-## Deliverable back to the principal
-
-Report: file tree, counts table (family x split x label), sha256 of test.jsonl, number of
-groups per family per split, gates and tests output (with the red-first evidence), five
-sample rows per family from test.jsonl, and a NOT PROVEN line. Commit locally with
-`Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`. No push, no GitHub repo.
