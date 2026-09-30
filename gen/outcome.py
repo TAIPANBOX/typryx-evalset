@@ -174,6 +174,12 @@ def _near_int(rng, right: int, extras: list[int]) -> int:
     return right + 1
 
 
+def _near_small(rng, right: int, extras: list[int]) -> int:
+    """A near miss for a count: one or two off, or a count of the wrong thing."""
+    cands = [c for c in (right - 2, right - 1, right + 1, right + 2, *extras) if c >= 0 and c != right]
+    return rng.choice(cands)
+
+
 def _near_words(rng, right: str, candidates: list[str]) -> str:
     cs = [c for c in candidates if c != right]
     if not cs:
@@ -258,7 +264,7 @@ def make_count(rng, category_mode: bool):
         rng.shuffle(items)
         right = len(items)
         return {"lst": ", ".join(items), "noun": dom, "cat": dom, "items": items, "category_mode": False}, str(right), \
-            lambda: str(_near_int(rng, right, [right + 2, max(right - 2, 0)]))
+            lambda: str(_near_small(rng, right, [len(items)]))
     cat = rng.choice(names)
     others = [x for x in names if x != cat]
     n_in = rng.randint(1, 6)
@@ -271,7 +277,7 @@ def make_count(rng, category_mode: bool):
     rng.shuffle(items)
     right = n_in
     return {"lst": ", ".join(items), "noun": "items", "cat": cat, "items": items, "category_mode": True}, str(right), \
-        lambda: str(_near_int(rng, right, [len(items), right + 2]))
+        lambda: str(_near_small(rng, right, [len(items)]))
 
 
 def make_reverse(rng):
@@ -299,7 +305,7 @@ def make_letters(rng):
     pool = sorted(set(w))
     letter = rng.choice(pool) if rng.random() < 0.9 else rng.choice("qzxj")
     right = w.count(letter)
-    return {"w": w, "l": letter}, str(right), lambda: str(_near_int(rng, right, [len(w), right + 2]))
+    return {"w": w, "l": letter}, str(right), lambda: str(_near_small(rng, right, [len(w)]))
 
 
 def make_sort(rng, mode: str):

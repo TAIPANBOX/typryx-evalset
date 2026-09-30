@@ -80,7 +80,7 @@ def classify(p: dict) -> str:
 # ------------------------------------------------------------ parameter draw
 
 PROJECTS = ["support-copilot", "billing-assistant", "doc-summarizer", "code-review-bot", "search-rerank", "sales-enrichment",
-            "invoice-extractor", "onboarding-agent", "fraud-triage", "meeting-notes", "ticket-router", "kb-answerer",
+            "invoice-extractor", "onboarding-flow", "fraud-triage", "meeting-notes", "ticket-router", "kb-answerer",
             "release-notes-writer", "data-labeler"]
 WINDOWS = ["week over week", "day over day", "versus the 7-day average", "since last Monday", "month over month", "against the prior 24 hours"]
 MODELS_BIG = ["gpt-4.1", "claude-opus", "gemini-2.5-pro", "llama-3.3-70b", "mistral-large"]

@@ -154,7 +154,7 @@ COMPARES = [
     {"a": "a monorepo", "b": "many small repos", "sit": "team of twelve engineers"},
     {"a": "Terraform", "b": "Pulumi", "sit": "startup with mostly TypeScript developers"},
     {"a": "REST", "b": "gRPC", "sit": "set of internal services with mixed languages"},
-    {"a": "Slack alerts", "b": "email digests", "sit": "spend alerts for finance managers"},
+    {"a": "Slack alerts", "b": "email digests", "sit": "finance team that wants spend notifications"},
 ]
 TALK = [
     {"n": "five", "aud": "the executive team", "topic": "last quarter's incident trends"},
