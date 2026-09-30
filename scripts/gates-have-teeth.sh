@@ -100,14 +100,14 @@ d="$(fresh nj-missing)"; rm -r "$d/data";                        expect "data/ m
 # ----------------------------------------------------------------- no-secrets
 gitfresh() {  # gitfresh COPY_NAME -> a fresh copy of the repo as a one-commit git repo
   local d; d="$(fresh "$1")"
-  git -C "$d" init -q -b main
-  git -C "$d" add -A
-  git -C "$d" -c user.name=teeth -c user.email=teeth@example.invalid commit -q -m "copy"
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C "$d" init -q -b main
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C "$d" add -A
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C "$d" -c user.name=teeth -c user.email=teeth@example.invalid commit -q -m "copy"
   echo "$d"
 }
 commit_all() {  # commit_all DIR MESSAGE
-  git -C "$1" add -A
-  git -C "$1" -c user.name=teeth -c user.email=teeth@example.invalid commit -q -m "$2"
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C "$1" add -A
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C "$1" -c user.name=teeth -c user.email=teeth@example.invalid commit -q -m "$2"
 }
 fake_token="ghp_""0123456789abcdefghij0123"      # GitHub-token shape, not a real token
 d="$(gitfresh ns-clean)"; expect "untouched repo" pass "$d" no-secrets
@@ -121,7 +121,7 @@ expect "a short fake key (not a fault)" pass "$d" no-secrets
 d="$(gitfresh ns-known)"; printf 'KEY = "%s"\n' "sk-""test-SECRET-0123456789" > "$d/gen/notes.py"; commit_all "$d" known
 rm "$d/gen/notes.py"; commit_all "$d" remove
 expect "the named historical fake literal (not a fault)" pass "$d" no-secrets
-d="$(fresh ns-missing)"; git -C "$d" init -q -b main
+d="$(fresh ns-missing)"; env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C "$d" init -q -b main
 expect "no tracked files" nothing "$d" no-secrets
 
 echo
