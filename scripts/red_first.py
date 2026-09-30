@@ -109,45 +109,70 @@ MUTANTS = {
         "split_groups no longer refuses a stratum too small to split",
         [("gen/common.py", "if n - n_dev - n_test < 1:", "if False:")],
         [SPL + "Splitter.test_too_few_groups_refuse_rather_than_leak"], "gen"),
-    "dominance-bar-lowered": (
-        "triage: a cause wins at half the cost increase instead of three quarters",
-        [("gen/triage.py", "DOM = 0.75", "DOM = 0.5")],
-        [LAB + "Triage.test_generator_classifier_agrees_with_the_reference_on_a_sweep", LAB + "Triage.test_truth_table_holds_for_reference_and_generator",
-         LAB + "Triage.test_a_dominant_cause_wins_even_when_a_second_cause_is_present"], "gen"),
-    "second-cause-vetoes": (
-        "triage: any second cause above 5 percent of the increase forces unknown (the old rule)",
-        [("gen/triage.py", 'return w[0] if len(w) == 1 else "unknown"',
-          'return w[0] if len(w) == 1 and sum(1 for v in shares(p).values() if v is not None and v > 0.05) == 1 else "unknown"')],
-        [LAB + "Triage.test_a_dominant_cause_wins_even_when_a_second_cause_is_present", LAB + "Triage.test_truth_table_holds_for_reference_and_generator"], "gen"),
-    "config-demands-traffic": (
-        "triage: misconfiguration needs traffic known (the tri-0231 bug)",
-        [("gen/triage.py", 's["config"] is not None and s["config"] >= DOM and e in SETTING_EVENTS:', 's["config"] is not None and s["config"] >= DOM and e in SETTING_EVENTS and p["traffic"] is not None:')],
-        [LAB + "Triage.test_a_label_does_not_demand_evidence_its_own_verdict_does_not_need", LAB + "Triage.test_truth_table_holds_for_reference_and_generator"], "gen"),
-    "bar-margin-removed": (
-        "triage: rows may sit on the 3/4 bar",
-        [("gen/triage.py", "MARGIN = 0.03", "MARGIN = 0.0")],
-        [LAB + "Triage.test_every_share_is_clear_of_the_bar_so_no_row_turns_on_a_hair"], "gen"),
     "spend-unreconciled": (
-        "triage: the headline spend drifts up to 15 points from what calls and price imply",
-        [("gen/triage.py", 'p["spend"] = round(100 * ((1 + c / 100) * (1 + pr / 100) * cfg - 1))', 'p["spend"] = round(100 * ((1 + c / 100) * (1 + pr / 100) * cfg - 1)) + rng.randint(-15, 15)')],
+        "triage: the headline spend is 15 points above from what calls and price imply",
+        [("gen/triage.py", 'p["spend"] = round(100 * ((1 + p["calls"] / 100) * (1 + p["price"] / 100) * cfg - 1))', 'p["spend"] = round(100 * ((1 + p["calls"] / 100) * (1 + p["price"] / 100) * cfg - 1)) + 15')],
         [LAB + "Triage.test_the_headline_spend_reconciles_with_the_shown_calls_and_price"], "gen"),
-    "unknown-always-blank": (
-        "every unknown scenario is a bare headline",
-        [("gen/triage.py", 'flavour = rng.choice(["hidden", "hidden", "comparable", "comparable", "contradict", "contradict", "gray", "unreconciled", "blank"])', 'flavour = "blank"')],
-        [LAB + "Triage.test_unknown_rows_come_in_the_three_flavours"], "gen"),
-    "missing-item-is-level-2": (
-        "quality: a level-2 answer omits an item instead of giving a vague one (the old wording)",
-        [("gen/quality.py", "chosen = [bank[i][0] for i in order[:n - 1]] + [bank[order[n - 1]][1]]\n                        clear_n, vague_n = n - 1, 1\n                        rng.shuffle(chosen)",
-          "chosen = [bank[i][0] for i in order[:n - 1]]\n                        clear_n, vague_n = n - 1, 0")],
-        [LAB + "Quality.test_level_is_recomputed_from_the_text_by_counting_the_topics_facts", LAB + "Quality.test_a_missing_item_is_never_level_two"], "gen"),
-    "level-rule-old-wording": (
-        "quality.level_of scores N-1 clear items and nothing else as level 2",
-        [("gen/quality.py", "    elif vague == 0 and 1 <= clear < n_asked:\n        return 1", "    elif vague == 0 and clear == n_asked - 1:\n        return 2\n    elif vague == 0 and 1 <= clear < n_asked:\n        return 1")],
-        [LAB + "Quality.test_a_missing_item_is_never_level_two", LAB + "Quality.test_generator_parameters_give_the_same_level"], "gen"),
-    "gray-zone-mislabelled": (
-        "gray-zone scenarios are drawn but the row is labelled expected_growth",
+    "growth-accepts-repeats": (
+        "triage.classify lets expected_growth through with mostly repeated prompts",
+        [("gen/triage.py", "and _price_flat(pr) and (u is None or u >= 50):\n        return \"expected_growth\"", "and _price_flat(pr):\n        return \"expected_growth\"")],
+        [LAB + "Triage.test_truth_table_holds_for_reference_and_generator", LAB + "Triage.test_generator_classifier_agrees_with_the_reference_on_a_sweep"], "gen"),
+    "growth-gap-widened": (
+        "triage.classify accepts calls and traffic 30 points apart as growth",
+        [("gen/triage.py", "abs(c - t) <= 10", "abs(c - t) <= 30")],
+        [LAB + "Triage.test_truth_table_holds_for_reference_and_generator", LAB + "Triage.test_generator_classifier_agrees_with_the_reference_on_a_sweep"], "gen"),
+    "runaway-small-jump-without-traffic": (
+        "triage.classify calls a +100 percent jump with no traffic figure a runaway",
+        [("gen/triage.py", "if t is None and c >= 400:", "if t is None and c >= 100:")],
+        [LAB + "Triage.test_truth_table_holds_for_reference_and_generator", LAB + "Triage.test_generator_classifier_agrees_with_the_reference_on_a_sweep"], "gen"),
+    "runaway-with-price-rise": (
+        "triage.classify lets a runaway keep a +31 percent price rise (two causes)",
+        [("gen/triage.py", "if c is not None and u is not None and u <= 25 and _price_flat(pr):", "if c is not None and u is not None and u <= 25:")],
+        [LAB + "Triage.test_truth_table_holds_for_reference_and_generator", LAB + "Triage.test_generator_classifier_agrees_with_the_reference_on_a_sweep"], "gen"),
+    "price-bar-lowered": (
+        "triage.classify calls a +10 percent price rise a price change",
+        [("gen/triage.py", "and pr >= 15 and", "and pr >= 5 and")],
+        [LAB + "Triage.test_truth_table_holds_for_reference_and_generator", LAB + "Triage.test_generator_classifier_agrees_with_the_reference_on_a_sweep"], "gen"),
+    "config-with-growth": (
+        "triage.classify calls a setting change plus +50 percent calls a misconfiguration (mixed)",
+        [("gen/triage.py", "if (c is None or _flat(c)) and (t is None or _flat(t)) and", "if (t is None or _flat(t)) and")],
+        [LAB + "Triage.test_truth_table_holds_for_reference_and_generator", LAB + "Triage.test_generator_classifier_agrees_with_the_reference_on_a_sweep"], "gen"),
+    "setting-event-dropped": (
+        "cache_disabled is left off the setting events (the tri-0231 class of bug)",
+        [("gen/triage.py", 'SETTING_EVENTS = ["cache_disabled", ', 'SETTING_EVENTS = [')],
+        [LAB + "Triage.test_every_setting_event_can_be_the_cause"], "gen"),
+    "unknown-with-a-figure": (
+        "triage.classify calls a row with one stated figure unknown",
+        [("gen/triage.py", "if c is None and t is None and u is None and pr is None:", "if c is None and t is None and pr is None:")],
+        [LAB + "Triage.test_truth_table_holds_for_reference_and_generator"], "gen"),
+    "thin-margin": (
+        "triage: growth rows draw calls up to 12 points from traffic, on the edge of the 10-point rule",
+        [("gen/triage.py", "calls=t + _rint(rng, -6, 6)", "calls=t + _rint(rng, -10, 10)")],
+        [LAB + "Triage.test_rows_sit_well_inside_their_class"], "gen"),
+    "unknown-always-the-same-event": (
+        "triage: unknown rows never vary their unrelated event",
+        [("gen/triage.py", "unique=None, price=None, event=rng.choice(QUIET_EVENTS), spend=_rint(rng, 25, 400))", "unique=None, price=None, event='none', spend=_rint(rng, 25, 400))")],
+        [LAB + "Triage.test_every_class_shows_up_in_its_varieties"], "gen"),
+    "level-rule-share-ignored": (
+        "quality.level_of scores one missing item out of three as level 2",
+        [("gen/quality.py", "if defects == 1 and (n_asked >= 4 or (vague == 1 and missing == 0)):", "if defects == 1:")],
+        [LAB + "Quality.test_level_table_holds_for_reference_and_generator", LAB + "Quality.test_three_of_four_is_level_two_and_two_of_three_is_level_one"], "gen"),
+    "level-two-allows-two-defects": (
+        "quality.level_of scores two defects out of five as level 2",
+        [("gen/quality.py", "if defects == 1 and (n_asked >= 4", "if defects <= 2 and (n_asked >= 4")],
+        [LAB + "Quality.test_level_table_holds_for_reference_and_generator"], "gen"),
+    "three-of-four-scored-one": (
+        "quality.level_of scores one missing item out of four or five as level 1 (the earlier rule)",
+        [("gen/quality.py", "if defects == 1 and (n_asked >= 4 or (vague == 1 and missing == 0)):", "if defects == 1 and vague == 1:")],
+        [LAB + "Quality.test_level_table_holds_for_reference_and_generator", LAB + "Quality.test_three_of_four_is_level_two_and_two_of_three_is_level_one"], "gen"),
+    "missing-item-in-three-labelled-2": (
+        "quality: for N = 3 a level-2 answer drops an item instead of giving a vague one",
+        [("gen/quality.py", "clear_n, vague_n = (2, 1) if n == 3 else (n - 1, rng.choice([0, 1]))", "clear_n, vague_n = (2, 0) if n == 3 else (n - 1, rng.choice([0, 1]))")],
+        [LAB + "Quality.test_level_is_recomputed_from_the_text_by_counting_the_topics_facts", LAB + "Quality.test_three_of_four_is_level_two_and_two_of_three_is_level_one"], "gen"),
+    "unstated-figures-read-as-unknown": (
+        "triage: misconfiguration rows with no call figure are labelled unknown (the tri-0106 reading)",
         [("gen/triage.py", "cases.append(Case(FAMILY, TEMPLATE, {\"anomaly\": anomaly, \"recent_changes\": changes}, lab, sid, p))",
-          "cases.append(Case(FAMILY, TEMPLATE, {\"anomaly\": anomaly, \"recent_changes\": changes}, ('expected_growth' if (lab == 'unknown' and p['traffic'] is not None and 10 < p['traffic'] < 20) else lab), sid, p))")],
+          "cases.append(Case(FAMILY, TEMPLATE, {\"anomaly\": anomaly, \"recent_changes\": changes}, ('unknown' if (lab == 'misconfiguration' and p['calls'] is None) else lab), sid, p))")],
         [LAB + "Triage.test_every_row_gold_is_the_label_of_its_parameters"], "gen"),
     "event-text-mismatch": (
         "the rendered change text names a cache change whatever the event parameter says",
@@ -229,8 +254,8 @@ MUTANTS = {
         [("gen/quality.py", '"clear": clear_n, "vague"', '"clear": clear_n + (1 if level == 1 else 0), "vague"')],
         [LAB + "Quality.test_generator_parameters_give_the_same_level"], "gen"),
     "level-rule-lenient": (
-        "level_of returns 1 for a build the spec does not define",
-        [("gen/quality.py", 'raise ValueError(f"no level for asked={n_asked} clear={clear} vague={vague}")', "return 1")],
+        "quality.level_of accepts more items than asked and three vague items",
+        [("gen/quality.py", "if missing < 0 or vague > 2:", "if False:")],
         [LAB + "Quality.test_level_rule_rejects_what_the_spec_does_not_define"], "gen"),
     "reference-verb-table-incomplete": (
         "(a fault in the TEST's own rule table) 'post' missing from the reversible verbs",
