@@ -61,11 +61,12 @@ model; nothing in this repo may call Jev or read Jev output).
    plausible near miss, guaranteed different. 250 true / 250 false, balanced per task kind.
 4. `eval.answer_quality` (score 0..3; fields `task`, `final_answer`). Tasks that ask for
    N concrete items or steps (e.g. "List four causes of X", "Give three steps to Y") with
-   a fixed fact bank per task; answer built at a level by the share of the task
-   done (defects = missing items + vague items): 3 = no defects; 2 = exactly one
-   defect and N >= 4, or exactly one vague item (none missing) when N = 3; 1 = at
-   least one correct clear item but more defects than level 2 allows; 0 = off-topic
-   answer. 125 per level. (Amended after two blind re-labels.)
+   a fixed fact bank per task (six clear, correct facts); the answer gives some of the N
+   items, every one a clear correct fact (no vague items are generated): 3 = all N
+   given; 2 = exactly N-1 given, only for N >= 4; 1 = at least one but at most half of N
+   given (1 of 3, 1 or 2 of 4, 1 or 2 of 5); 0 = off-topic answer, none given. The
+   in-between shares (2 of 3, 3 of 5) are never generated. 125 per level. (Amended
+   after three blind re-labels.)
 5. `action.risk_class` (NEW, choice; fields `tool`, `arguments`, `target`). Classifies an
    agent's pending tool call for a Wardryx policy signal. Options and criteria:
    - `read_only`: reads or lists data, changes nothing
