@@ -201,7 +201,24 @@ How to read it:
 - Per-family intervals are wide. Each family has about 70 test rows, and at that size an
   accuracy near 87% carries a 95% interval roughly 16 points across, and one near 70%
   roughly 21. Differences between backends on a single family are mostly within noise.
+  Within one backend a family can still stand clear of another: see the next table.
   The overall figures, at 434 rows, are the ones to read.
+
+The hosted service by family, the same run (accuracy with its 95% Wilson interval, and
+ECE):
+
+| Family | Rows | Accuracy | 95% interval | ECE |
+|---|---|---|---|---|
+| `action.risk_class` | 69 | 100.0% | [94.7, 100.0] | 0.023 |
+| `console.question_topic` | 69 | 100.0% | [94.7, 100.0] | 0.038 |
+| `request.complexity` | 71 | 98.6% | [92.4, 99.8] | 0.102 |
+| `triage.anomaly_class` | 77 | 87.0% | [77.7, 92.8] | 0.085 |
+| `eval.outcome_met` | 73 | 69.9% | [58.6, 79.2] | 0.165 |
+| `eval.answer_quality` | 75 | 69.3% | [58.2, 78.6] | 0.153 |
+
+The three families where an answer is recognised (risk, topic, complexity) sit clear of
+the two where work has to be checked (outcome met, answer quality): their intervals do
+not overlap. Triage sits between the two groups.
 
 The result files behind these numbers are kept outside the repository.
 
@@ -241,8 +258,9 @@ to beat. Keep the test split out of any tuning, or its number stops meaning anyt
 - **Latency under load.** The latencies are sequential single-setup figures, not load
   tests.
 - **Calibration outside this distribution.** ECE is measured on this set only.
-- **Per-family results.** Not reported, because the intervals at about 70 rows each are
-  too wide to support a claim.
+- **Per-family comparisons between backends.** Not made here. The per-family table above
+  is for one backend, and only the separations whose intervals do not overlap are read
+  from it.
 - **Contamination from here on.** The test split is public and frozen. Anything tuned on
   it, or on a model that saw this repository, makes its own result here meaningless.
 - **Downstream value.** That a better typed answer improves an agent's outcome, or lowers
