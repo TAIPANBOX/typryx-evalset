@@ -28,7 +28,9 @@ stack asks a typed question.
 | `action.risk_class` | choice | read_only, reversible_change, destructive, external_send, financial |
 | `console.question_topic` | choice | spend, incident, identity, approval, other |
 
-The six typryx templates are in `templates/`. A row looks like this:
+The six templates the questions are asked under are in `templates/`. Five are
+byte-identical to typryx's starter templates in `examples/templates/`;
+`console.question_topic` is not one of them. A row looks like this:
 
 ```json
 {"family":"request.complexity","gold":"cheap","group":"cx.cheap.16","id":"cx-0004","source":"construct","state":{"prompt":"Hey, convert to uppercase: rollback finished"},"template":"request.complexity"}
@@ -271,7 +273,7 @@ to beat. Keep the test split out of any tuning, or its number stops meaning anyt
 | Path | What lives there |
 |---|---|
 | `SPEC.md` | the specification the set was built to |
-| `templates/` | the six typryx templates the questions are asked under |
+| `templates/` | the six templates the questions are asked under: five copied byte for byte from typryx's `examples/templates/`, and `console.question_topic`, which is not one of them |
 | `gen/` | one generator per family, and `gen/build.py`, the builder and splitter |
 | `data/` | `all`, `train`, `dev` and `test` as JSONL, `MANIFEST.json`, `CHANGELOG.md` |
 | `bench/` | `run.py` (ask a typryx every row) and `metrics.py` |
